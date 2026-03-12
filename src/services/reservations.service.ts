@@ -5,11 +5,7 @@ import type { CreateReservationInput, Reservation, ReservationLookup } from '../
 export async function fetchReservations(): Promise<Reservation[]> {
   if (!isSupabaseConfigured || !supabase) return mockReservations
 
-  const { data, error } = await supabase
-    .from('reservations')
-    .select('*')
-    .order('event_date', { ascending: true })
-
+  const { data, error } = await supabase.from('reservations').select('*').order('event_date', { ascending: true })
   if (error) throw error
   return (data ?? []) as Reservation[]
 }
@@ -57,28 +53,11 @@ export async function createReservation(input: CreateReservationInput): Promise<
 export async function fetchReservationLookupByToken(token: string): Promise<ReservationLookup | null> {
   if (!isSupabaseConfigured || !supabase) return mockLookupByToken(token)
 
-  const { data: reservation, error: reservationError } = await supabase
-    .from('reservations')
-    .select('*')
-    .eq('public_link_token', token)
-    .single()
+  const { data, error } = await supabase.rpc('get_public_reservation_lookup', {
+    p_token: token,
+  })
 
-  if (reservationError) {
-    if (reservationError.code === 'PGRST116') return null
-    throw reservationError
-  }
-
-  const [{ data: payments, error: paymentsError }, { data: contract, error: contractError }] = await Promise.all([
-    supabase.from('payments').select('*').eq('reservation_id', reservation.id).order('created_at', { ascending: false }),
-    supabase.from('contracts').select('*').eq('reservation_id', reservation.id).maybeSingle(),
-  ])
-
-  if (paymentsError) throw paymentsError
-  if (contractError) throw contractError
-
-  return {
-    reservation: reservation as Reservation,
-    payments: (payments ?? []) as ReservationLookup['payments'],
-    contract: (contract ?? null) as ReservationLookup['contract'],
-  }
+  if (error) throw error
+  if (!data) return null
+  return data as ReservationLookup
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AvailabilityCalendar } from '../../components/calendar/AvailabilityCalendar'
 import { LoadingState } from '../../components/ui/LoadingState'
 import { getMonthBoundaries } from '../../lib/format'
+import { subscribeToTables } from '../../lib/realtime'
 import { getPublicCalendar } from '../../services/calendar.service'
 import { createLead, getDefaultSpaceId } from '../../services/leads.service'
 import type { CalendarDay } from '../../types/database'
@@ -32,19 +33,25 @@ export default function AvailabilityPage() {
 
   const boundaries = useMemo(() => getMonthBoundaries(referenceDate), [referenceDate])
 
-  useEffect(() => {
+  async function loadCalendar() {
     setLoading(true)
-    Promise.all([getPublicCalendar(boundaries), getDefaultSpaceId()])
-      .then(([calendar, id]) => {
-        setCalendarEntries(calendar)
-        setSpaceId(id)
-        setError(null)
-      })
-      .catch((serviceError) => {
-        setError(serviceError.message || 'Não foi possível carregar o calendário.')
-      })
-      .finally(() => setLoading(false))
-  }, [boundaries])
+    try {
+      const [calendar, id] = await Promise.all([getPublicCalendar(boundaries), getDefaultSpaceId()])
+      setCalendarEntries(calendar)
+      setSpaceId(id)
+      setError(null)
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Não foi possível carregar o calendário.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadCalendar()
+  }, [boundaries.from, boundaries.to])
+
+  useEffect(() => subscribeToTables(['reservations', 'payment_orders'], () => void loadCalendar()), [boundaries.from, boundaries.to])
 
   function handleChange(field: keyof LeadFormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -70,7 +77,7 @@ export default function AvailabilityPage() {
         space_id: spaceId,
       })
 
-      setFeedback('Interesse enviado com sucesso. Agora você já consegue visualizar esse lead no painel administrativo.')
+      setFeedback('Interesse enviado com sucesso. Em seguida você pode receber proposta, link de pagamento e contrato.')
       setForm({
         customer_name: '',
         customer_phone: '',
@@ -101,10 +108,18 @@ export default function AvailabilityPage() {
           )}
 
           <div className="month-navigation">
-            <button type="button" className="button button-secondary" onClick={() => setReferenceDate(new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, 1))}>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => setReferenceDate(new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, 1))}
+            >
               Mês anterior
             </button>
-            <button type="button" className="button button-secondary" onClick={() => setReferenceDate(new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1))}>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => setReferenceDate(new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1))}
+            >
               Próximo mês
             </button>
           </div>

@@ -1,10 +1,12 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { formatCurrency, formatDate } from '../../lib/format'
+import { formatCountdown, formatCurrency, formatDate } from '../../lib/format'
+import { subscribeToTables } from '../../lib/realtime'
 import { getDefaultSpaceId } from '../../services/leads.service'
+import { createPaymentOrder, fetchPaymentOrders } from '../../services/payment-orders.service'
 import { createReservation, fetchReservations } from '../../services/reservations.service'
-import type { Reservation, ReservationStatus } from '../../types/database'
+import type { PaymentOrder, Reservation, ReservationStatus } from '../../types/database'
 
 const reservationStatusOptions: ReservationStatus[] = [
   'interesse_enviado',
@@ -16,10 +18,12 @@ const reservationStatusOptions: ReservationStatus[] = [
 
 export default function ReservationsPage() {
   const [reservations, setReservations] = useState<Reservation[]>([])
+  const [paymentOrders, setPaymentOrders] = useState<PaymentOrder[]>([])
   const [spaceId, setSpaceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [creatingPaymentFor, setCreatingPaymentFor] = useState<string | null>(null)
   const [form, setForm] = useState({
     customer_name: '',
     customer_phone: '',
@@ -34,8 +38,13 @@ export default function ReservationsPage() {
   async function loadData() {
     setLoading(true)
     try {
-      const [reservationsData, defaultSpaceId] = await Promise.all([fetchReservations(), getDefaultSpaceId()])
+      const [reservationsData, defaultSpaceId, paymentOrdersData] = await Promise.all([
+        fetchReservations(),
+        getDefaultSpaceId(),
+        fetchPaymentOrders(),
+      ])
       setReservations(reservationsData)
+      setPaymentOrders(paymentOrdersData)
       setSpaceId(defaultSpaceId)
       setError(null)
     } catch (serviceError) {
@@ -48,6 +57,8 @@ export default function ReservationsPage() {
   useEffect(() => {
     void loadData()
   }, [])
+
+  useEffect(() => subscribeToTables(['reservations', 'payment_orders'], () => void loadData()), [])
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -87,12 +98,39 @@ export default function ReservationsPage() {
     }
   }
 
+  async function handleCreatePaymentOrder(reservation: Reservation) {
+    setCreatingPaymentFor(reservation.id)
+    setError(null)
+    setSuccess(null)
+    try {
+      const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
+      const result = await createPaymentOrder({
+        reservationId: reservation.id,
+        amount,
+        expiresInMinutes: 60,
+        title: `Entrada reserva ${reservation.event_date}`,
+      })
+      setSuccess(result.paymentUrl ? `Checkout criado com sucesso: ${result.paymentUrl}` : 'Checkout criado com sucesso.')
+      await loadData()
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao criar checkout.')
+    } finally {
+      setCreatingPaymentFor(null)
+    }
+  }
+
+  const paymentOrdersMap = useMemo(() => {
+    return paymentOrders.reduce<Record<string, PaymentOrder>>((accumulator, item) => {
+      if (!accumulator[item.reservation_id] || accumulator[item.reservation_id].created_at < item.created_at) {
+        accumulator[item.reservation_id] = item
+      }
+      return accumulator
+    }, {})
+  }, [paymentOrders])
+
   return (
     <div className="stack-lg">
-      <PageHeader
-        title="Reservas"
-        description="Gestão de negociações confirmadas, bloqueios temporários e disponibilidade operacional."
-      />
+      <PageHeader title="Reservas" description="Gestão de datas, bloqueios, propostas e geração de checkout da entrada." />
 
       <div className="dashboard-grid">
         <article className="card form-card">
@@ -159,25 +197,53 @@ export default function ReservationsPage() {
                   <th>Cliente</th>
                   <th>Data</th>
                   <th>Total</th>
-                  <th>Entrada</th>
                   <th>Status</th>
+                  <th>Checkout</th>
+                  <th>Ação</th>
                 </tr>
               </thead>
               <tbody>
-                {reservations.map((reservation) => (
-                  <tr key={reservation.id}>
-                    <td>
-                      <strong>{reservation.customer_name}</strong>
-                      <div className="table-helper">{reservation.customer_phone}</div>
-                    </td>
-                    <td>{formatDate(reservation.event_date)}</td>
-                    <td>{formatCurrency(reservation.total_amount)}</td>
-                    <td>{formatCurrency(reservation.entry_amount)}</td>
-                    <td>
-                      <StatusBadge status={reservation.status} />
-                    </td>
-                  </tr>
-                ))}
+                {reservations.map((reservation) => {
+                  const paymentOrder = paymentOrdersMap[reservation.id]
+                  return (
+                    <tr key={reservation.id}>
+                      <td>
+                        <strong>{reservation.customer_name}</strong>
+                        <div className="table-helper">{reservation.customer_phone}</div>
+                      </td>
+                      <td>{formatDate(reservation.event_date)}</td>
+                      <td>{formatCurrency(reservation.total_amount)}</td>
+                      <td>
+                        <StatusBadge status={reservation.status} />
+                      </td>
+                      <td>
+                        {paymentOrder ? (
+                          <div className="stack-list">
+                            <StatusBadge status={paymentOrder.status} />
+                            <span className="table-helper">Expira em {formatCountdown(paymentOrder.expires_at)}</span>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <button
+                            className="button button-secondary"
+                            type="button"
+                            onClick={() => void handleCreatePaymentOrder(reservation)}
+                            disabled={creatingPaymentFor === reservation.id || !(reservation.entry_amount ?? reservation.total_amount)}
+                          >
+                            {creatingPaymentFor === reservation.id ? 'Gerando...' : 'Gerar checkout'}
+                          </button>
+                          <a className="button button-secondary" href={`/minha-reserva/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
+                            Link do cliente
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}

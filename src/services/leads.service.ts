@@ -5,12 +5,7 @@ import type { CreateLeadInput, Lead } from '../types/database'
 export async function getDefaultSpaceId(slug = '3deventos'): Promise<string> {
   if (!isSupabaseConfigured || !supabase) return mockSpace.id
 
-  const { data, error } = await supabase
-    .from('spaces')
-    .select('id, slug')
-    .eq('slug', slug)
-    .single()
-
+  const { data, error } = await supabase.from('spaces').select('id, slug').eq('slug', slug).single()
   if (error) throw error
   return data.id as string
 }
@@ -37,7 +32,15 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
     }
   }
 
-  const { data, error } = await supabase.from('leads').insert(input).select('*').single()
+  const { data, error } = await supabase
+    .from('leads')
+    .insert({
+      ...input,
+      source: 'site',
+    })
+    .select('*')
+    .single()
+
   if (error) throw error
   return data as Lead
 }

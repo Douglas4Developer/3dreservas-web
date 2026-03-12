@@ -11,7 +11,10 @@ export default function PublicLayout() {
           </Link>
           <nav className="public-nav">
             <NavLink to="/">Início</NavLink>
+            <NavLink to="/espaco">O espaço</NavLink>
+            <NavLink to="/galeria">Galeria</NavLink>
             <NavLink to="/disponibilidade">Disponibilidade</NavLink>
+            <NavLink to="/como-funciona">Como funciona</NavLink>
             <NavLink to="/admin">Painel</NavLink>
           </nav>
         </div>
@@ -31,11 +34,11 @@ export default function PublicLayout() {
         <div className="container public-footer__inner">
           <div>
             <strong>3DReservas</strong>
-            <p>Gestão de reservas, pagamentos, contratos e agenda do 3Deventos.</p>
+            <p>Gestão de reservas, pagamentos, contratos, galeria do espaço e agenda do 3Deventos.</p>
           </div>
           <div>
             <p>Stack recomendada: React + Supabase + Vercel</p>
-            <p>Baixo custo, boa escalabilidade e deploy simples.</p>
+            <p>MVP com baixo custo, Edge Functions, webhooks e crescimento gradual.</p>
           </div>
         </div>
       </footer>

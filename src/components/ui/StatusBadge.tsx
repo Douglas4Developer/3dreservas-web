@@ -1,6 +1,19 @@
-import type { ContractStatus, LeadStatus, PaymentStatus, ReservationStatus } from '../../types/database'
+import type {
+  ContractStatus,
+  LeadStatus,
+  PaymentOrderStatus,
+  PaymentStatus,
+  ReservationStatus,
+  WhatsappMessageStatus,
+} from '../../types/database'
 
-type SupportedStatus = LeadStatus | ReservationStatus | PaymentStatus | ContractStatus
+type SupportedStatus =
+  | LeadStatus
+  | ReservationStatus
+  | PaymentStatus
+  | ContractStatus
+  | PaymentOrderStatus
+  | WhatsappMessageStatus
 
 const statusLabelMap: Record<SupportedStatus, string> = {
   novo: 'Novo',
@@ -18,8 +31,16 @@ const statusLabelMap: Record<SupportedStatus, string> = {
   falhou: 'Falhou',
   estornado: 'Estornado',
   rascunho: 'Rascunho',
+  aguardando_geracao: 'Aguardando geração',
   liberado_assinatura: 'Aguardando assinatura',
   assinado: 'Assinado',
+  pending: 'Checkout pendente',
+  paid: 'Checkout pago',
+  expired: 'Expirado',
+  failed: 'Falhou',
+  cancelled: 'Cancelado',
+  queued: 'Na fila',
+  sent: 'Enviado',
 }
 
 export function StatusBadge({ status }: { status: SupportedStatus }) {

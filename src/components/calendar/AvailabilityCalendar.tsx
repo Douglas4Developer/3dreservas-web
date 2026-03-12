@@ -78,6 +78,7 @@ export function AvailabilityCalendar({
           }
 
           const isSelected = selectedDate === item.date
+          const isUnavailable = ['bloqueio_temporario', 'aguardando_pagamento', 'reservado'].includes(item.status ?? '')
 
           return (
             <button
@@ -86,7 +87,8 @@ export function AvailabilityCalendar({
               className={`calendar-day ${item.status ? `calendar-day--${item.status}` : 'calendar-day--disponivel'} ${
                 isSelected ? 'calendar-day--selected' : ''
               }`}
-              onClick={() => onSelectDate?.(item.date!)}
+              onClick={() => !isUnavailable && onSelectDate?.(item.date!)}
+              disabled={isUnavailable}
             >
               <span className="calendar-day__number">{item.dayNumber}</span>
               <span className="calendar-day__status">{item.status ? item.status.replace(/_/g, ' ') : 'disponível'}</span>

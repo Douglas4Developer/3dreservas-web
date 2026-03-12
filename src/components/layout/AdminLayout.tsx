@@ -6,6 +6,7 @@ const navigation = [
   { to: '/admin/leads', label: 'Interesses' },
   { to: '/admin/reservas', label: 'Reservas' },
   { to: '/admin/contratos', label: 'Contratos' },
+  { to: '/admin/midia', label: 'Mídia do espaço' },
 ]
 
 export default function AdminLayout() {
@@ -18,7 +19,7 @@ export default function AdminLayout() {
           <div className="brand-mark brand-mark--sidebar">
             <span className="brand-mark__accent">3D</span>Reservas
           </div>
-          <p className="sidebar-caption">Operação comercial e administrativa do 3Deventos.</p>
+          <p className="sidebar-caption">Operação comercial, pagamentos, contratos e vitrine do 3Deventos.</p>
         </div>
 
         <nav className="admin-nav">
@@ -43,7 +44,7 @@ export default function AdminLayout() {
         <header className="admin-topbar">
           <div>
             <h2>3DReservas</h2>
-            <p>Agenda, interessados, contratos e pagamentos em uma única operação.</p>
+            <p>Agenda, interessados, contratos, links seguros, mídia pública e pagamento em uma única operação.</p>
           </div>
         </header>
         <div className="admin-page-wrapper">

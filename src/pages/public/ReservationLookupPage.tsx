@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { formatCurrency, formatDate, formatDateTime } from '../../lib/format'
+import { formatCountdown, formatCurrency, formatDate, formatDateTime } from '../../lib/format'
 import { fetchReservationLookupByToken } from '../../services/reservations.service'
 import type { ReservationLookup } from '../../types/database'
 
@@ -76,6 +76,28 @@ export default function ReservationLookupPage() {
         </article>
 
         <article className="card details-card">
+          <h2>Checkout da entrada</h2>
+          {lookup.activePaymentOrder ? (
+            <div className="stack-list">
+              <div className="line-card">
+                <div>
+                  <strong>{formatCurrency(lookup.activePaymentOrder.amount)}</strong>
+                  <p>Expira em {formatCountdown(lookup.activePaymentOrder.expires_at)}</p>
+                </div>
+                <StatusBadge status={lookup.activePaymentOrder.status} />
+              </div>
+              {lookup.activePaymentOrder.checkout_url ? (
+                <a className="button" href={lookup.activePaymentOrder.checkout_url} target="_blank" rel="noreferrer">
+                  Ir para o pagamento
+                </a>
+              ) : (
+                <p>O link de pagamento ainda está sendo preparado.</p>
+              )}
+            </div>
+          ) : (
+            <p>Nenhum checkout pendente para esta reserva.</p>
+          )}
+
           <h2>Pagamento</h2>
           {lookup.payments.length === 0 ? (
             <p>Nenhum pagamento cadastrado ainda.</p>
@@ -106,7 +128,7 @@ export default function ReservationLookupPage() {
                 <StatusBadge status={lookup.contract.status} />
               </div>
               {lookup.contract.file_path ? (
-                <a className="button" href={lookup.contract.file_path} target="_blank" rel="noreferrer">
+                <a className="button button-secondary" href={lookup.contract.file_path} target="_blank" rel="noreferrer">
                   Abrir contrato
                 </a>
               ) : (

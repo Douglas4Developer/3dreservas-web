@@ -30,6 +30,27 @@ export function formatPhone(value?: string | null) {
   return value || '-'
 }
 
+export function formatStatusText(value?: string | null) {
+  if (!value) return '-'
+  return value.replace(/_/g, ' ')
+}
+
+export function formatCountdown(value?: string | null) {
+  if (!value) return '-'
+  const diff = new Date(value).getTime() - Date.now()
+  if (diff <= 0) return 'Expirado'
+  const totalMinutes = Math.floor(diff / 1000 / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours <= 0) return `${minutes} min`
+  return `${hours}h ${minutes.toString().padStart(2, '0')}m`
+}
+
+export function toDateInputValue(value?: string | null) {
+  if (!value) return ''
+  return value.slice(0, 10)
+}
+
 export function getMonthBoundaries(referenceDate: Date) {
   const firstDay = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1)
   const lastDay = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0)
@@ -44,4 +65,13 @@ export function buildMonthLabel(referenceDate: Date) {
     month: 'long',
     year: 'numeric',
   })
+}
+
+export function sanitizeFileName(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9.-]/g, '-')
+    .replace(/-+/g, '-')
+    .toLowerCase()
 }
