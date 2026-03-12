@@ -79,7 +79,7 @@ export function AvailabilityCalendar({
               className={`calendar-day ${isReserved ? 'calendar-day--reservado' : 'calendar-day--disponivel'} ${
                 isSelected ? 'calendar-day--selected' : ''
               }`}
-              onClick={() => !isReserved && onSelectDate?.(item.date)}
+              onClick={() => !isReserved && onSelectDate?.(item.date!)}
               disabled={isReserved}
             >
               <span className="calendar-day__number">{item.dayNumber}</span>
