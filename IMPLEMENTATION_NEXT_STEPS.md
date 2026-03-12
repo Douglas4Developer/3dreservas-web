@@ -31,9 +31,9 @@ New routes already included:
 ## 3. Required Vercel env vars
 
 ```env
-VITE_SUPABASE_URL=... secret
-VITE_SUPABASE_ANON_KEY=... secret
-VITE_APP_URL=https://3dreservas-web.vercel.app/
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+VITE_APP_URL=https://YOUR_VERCEL_DOMAIN.vercel.app
 ```
 
 ## 4. Required Supabase secrets

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 
 const navigation = [
   { to: '/admin', label: 'Dashboard' },
+  { to: '/admin/calendario', label: 'Calendário' },
   { to: '/admin/leads', label: 'Interesses' },
   { to: '/admin/reservas', label: 'Reservas' },
   { to: '/admin/contratos', label: 'Contratos' },

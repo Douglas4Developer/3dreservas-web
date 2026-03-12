@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { buildMonthLabel } from '../../lib/format'
-import type { CalendarDay, ReservationStatus } from '../../types/database'
+import type { CalendarDay } from '../../types/database'
 
 interface AvailabilityCalendarProps {
   referenceDate: Date
@@ -8,14 +8,6 @@ interface AvailabilityCalendarProps {
   selectedDate?: string
   onSelectDate?: (date: string) => void
 }
-
-const visibleStatuses: ReservationStatus[] = [
-  'interesse_enviado',
-  'bloqueio_temporario',
-  'aguardando_pagamento',
-  'reservado',
-  'cancelado',
-]
 
 export function AvailabilityCalendar({
   referenceDate,
@@ -31,7 +23,7 @@ export function AvailabilityCalendar({
     const startWeekDay = firstDay.getDay()
     const daysInMonth = lastDay.getDate()
 
-    const items: Array<{ date: string | null; dayNumber: number | null; status?: ReservationStatus }> = []
+    const items: Array<{ date: string | null; dayNumber: number | null; status?: 'reservado' }> = []
 
     for (let index = 0; index < startWeekDay; index += 1) {
       items.push({ date: null, dayNumber: null })
@@ -45,7 +37,7 @@ export function AvailabilityCalendar({
       items.push({
         date: isoDate,
         dayNumber: day,
-        status: entry?.status,
+        status: entry?.status === 'reservado' ? 'reservado' : undefined,
       })
     }
 
@@ -57,11 +49,11 @@ export function AvailabilityCalendar({
       <div className="calendar-card__header">
         <div>
           <h3>{monthLabel}</h3>
-          <p>Clique em uma data para iniciar o interesse do cliente.</p>
+          <p>No calendário público aparecem apenas dias disponíveis e reservados.</p>
         </div>
       </div>
 
-      <div className="calendar-grid calendar-grid--header">
+      <div className="calendar-grid calendar-grid--header availability-weekdays">
         <span>Dom</span>
         <span>Seg</span>
         <span>Ter</span>
@@ -71,27 +63,28 @@ export function AvailabilityCalendar({
         <span>Sáb</span>
       </div>
 
-      <div className="calendar-grid">
+      <div className="calendar-grid calendar-grid--public-month">
         {calendarDays.map((item, index) => {
           if (!item.date) {
             return <div key={`empty-${index}`} className="calendar-day calendar-day--empty" />
           }
 
           const isSelected = selectedDate === item.date
-          const isUnavailable = ['bloqueio_temporario', 'aguardando_pagamento', 'reservado'].includes(item.status ?? '')
+          const isReserved = item.status === 'reservado'
 
           return (
             <button
               type="button"
               key={item.date}
-              className={`calendar-day ${item.status ? `calendar-day--${item.status}` : 'calendar-day--disponivel'} ${
+              className={`calendar-day ${isReserved ? 'calendar-day--reservado' : 'calendar-day--disponivel'} ${
                 isSelected ? 'calendar-day--selected' : ''
               }`}
-              onClick={() => !isUnavailable && onSelectDate?.(item.date!)}
-              disabled={isUnavailable}
+              onClick={() => !isReserved && onSelectDate?.(item.date)}
+              disabled={isReserved}
             >
               <span className="calendar-day__number">{item.dayNumber}</span>
-              <span className="calendar-day__status">{item.status ? item.status.replace(/_/g, ' ') : 'disponível'}</span>
+              <span className="calendar-day__status">{isReserved ? 'Reservado' : 'Disponível'}</span>
+              {!isReserved ? <span className="calendar-day__action">Toque para selecionar</span> : null}
             </button>
           )
         })}
@@ -99,11 +92,7 @@ export function AvailabilityCalendar({
 
       <div className="calendar-legend">
         <span className="legend-item legend-item--disponivel">Disponível</span>
-        {visibleStatuses.map((status) => (
-          <span key={status} className={`legend-item legend-item--${status}`}>
-            {status.replace(/_/g, ' ')}
-          </span>
-        ))}
+        <span className="legend-item legend-item--reservado">Reservado</span>
       </div>
     </div>
   )

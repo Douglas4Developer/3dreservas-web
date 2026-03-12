@@ -81,7 +81,7 @@ export default function ContractPage() {
           <div className="line-card">
             <div>
               <h1>Contrato da reserva</h1>
-              <p>Pagamento confirmado, contrato liberado para assinatura eletrônica simples.</p>
+              <p>Após o pagamento confirmado, o contrato fica disponível para leitura e assinatura.</p>
             </div>
             {lookup.contract ? <StatusBadge status={lookup.contract.status} /> : null}
           </div>
@@ -94,7 +94,7 @@ export default function ContractPage() {
                 Abrir versão publicada do contrato
               </a>
             ) : (
-              <p>O conteúdo do contrato ainda está sendo preparado.</p>
+              <p>O contrato ainda não foi liberado. Se você já pagou a entrada, aguarde a liberação pelo administrador.</p>
             )}
           </div>
         </article>

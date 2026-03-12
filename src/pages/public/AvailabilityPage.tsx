@@ -77,7 +77,7 @@ export default function AvailabilityPage() {
         space_id: spaceId,
       })
 
-      setFeedback('Interesse enviado com sucesso. Em seguida você pode receber proposta, link de pagamento e contrato.')
+      setFeedback('Interesse enviado com sucesso. Agora vamos analisar a data e te enviar a proposta.')
       setForm({
         customer_name: '',
         customer_phone: '',
@@ -94,19 +94,12 @@ export default function AvailabilityPage() {
 
   return (
     <section className="section-block">
-      <div className="container page-grid page-grid--public">
-        <div>
-          {loading ? (
-            <LoadingState label="Carregando disponibilidade..." />
-          ) : (
-            <AvailabilityCalendar
-              referenceDate={referenceDate}
-              entries={calendarEntries}
-              selectedDate={form.desired_date}
-              onSelectDate={(value) => handleChange('desired_date', value)}
-            />
-          )}
-
+      <div className="container stack-lg">
+        <div className="page-header availability-header">
+          <div>
+            <h1>Disponibilidade</h1>
+            <p>No calendário público aparecem apenas duas situações: disponível e reservado.</p>
+          </div>
           <div className="month-navigation">
             <button
               type="button"
@@ -125,40 +118,60 @@ export default function AvailabilityPage() {
           </div>
         </div>
 
-        <aside className="card form-card">
-          <h2>Demonstrar interesse</h2>
-          <p>Selecione uma data no calendário e envie seus dados para iniciar a negociação.</p>
+        <div className="page-grid page-grid--public availability-layout">
+          <div className="stack-lg">
+            {loading ? (
+              <LoadingState label="Carregando disponibilidade..." />
+            ) : (
+              <AvailabilityCalendar
+                referenceDate={referenceDate}
+                entries={calendarEntries}
+                selectedDate={form.desired_date}
+                onSelectDate={(value) => handleChange('desired_date', value)}
+              />
+            )}
+          </div>
 
-          <form className="form-grid" onSubmit={handleSubmit}>
-            <label>
-              Nome
-              <input value={form.customer_name} onChange={(event) => handleChange('customer_name', event.target.value)} required />
-            </label>
-            <label>
-              Telefone / WhatsApp
-              <input value={form.customer_phone} onChange={(event) => handleChange('customer_phone', event.target.value)} required />
-            </label>
-            <label>
-              E-mail
-              <input type="email" value={form.customer_email} onChange={(event) => handleChange('customer_email', event.target.value)} />
-            </label>
-            <label>
-              Data desejada
-              <input type="date" value={form.desired_date} onChange={(event) => handleChange('desired_date', event.target.value)} required />
-            </label>
-            <label>
-              Observações
-              <textarea rows={4} value={form.message} onChange={(event) => handleChange('message', event.target.value)} />
-            </label>
+          <aside className="card form-card availability-interest-card">
+            <h2>Demonstrar interesse</h2>
+            <p>Escolha um dia disponível no calendário e envie seus dados para iniciarmos a negociação.</p>
 
-            {feedback ? <div className="alert alert-success">{feedback}</div> : null}
-            {error ? <div className="alert alert-error">{error}</div> : null}
+            <div className="selected-date-box">
+              <strong>Data selecionada</strong>
+              <span>{form.desired_date ? new Date(`${form.desired_date}T12:00:00`).toLocaleDateString('pt-BR') : 'Nenhuma data selecionada'}</span>
+            </div>
 
-            <button className="button" type="submit" disabled={submitting}>
-              {submitting ? 'Enviando...' : 'Enviar interesse'}
-            </button>
-          </form>
-        </aside>
+            <form className="form-grid" onSubmit={handleSubmit}>
+              <label>
+                Nome
+                <input value={form.customer_name} onChange={(event) => handleChange('customer_name', event.target.value)} required />
+              </label>
+              <label>
+                Telefone / WhatsApp
+                <input value={form.customer_phone} onChange={(event) => handleChange('customer_phone', event.target.value)} required />
+              </label>
+              <label>
+                E-mail
+                <input type="email" value={form.customer_email} onChange={(event) => handleChange('customer_email', event.target.value)} />
+              </label>
+              <label>
+                Data desejada
+                <input type="date" value={form.desired_date} onChange={(event) => handleChange('desired_date', event.target.value)} required />
+              </label>
+              <label>
+                Observações
+                <textarea rows={4} value={form.message} onChange={(event) => handleChange('message', event.target.value)} />
+              </label>
+
+              {feedback ? <div className="alert alert-success">{feedback}</div> : null}
+              {error ? <div className="alert alert-error">{error}</div> : null}
+
+              <button className="button" type="submit" disabled={submitting}>
+                {submitting ? 'Enviando...' : 'Enviar interesse'}
+              </button>
+            </form>
+          </aside>
+        </div>
       </div>
     </section>
   )

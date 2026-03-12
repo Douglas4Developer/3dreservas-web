@@ -3,15 +3,19 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatDate, formatDateTime } from '../../lib/format'
 import { subscribeToTables } from '../../lib/realtime'
-import { generateContract, fetchContracts } from '../../services/contracts.service'
+import { fetchContracts, generateContract } from '../../services/contracts.service'
 import { fetchReservations } from '../../services/reservations.service'
 import { fetchSignatures, registerAdminSignature } from '../../services/signatures.service'
 import type { Contract, Reservation, Signature } from '../../types/database'
 
+interface ContractRow {
+  reservation: Reservation
+  contract: Contract | null
+  signatures: Signature[]
+}
+
 export default function ContractsPage() {
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [reservations, setReservations] = useState<Reservation[]>([])
-  const [signaturesMap, setSignaturesMap] = useState<Record<string, Signature[]>>({})
+  const [rows, setRows] = useState<ContractRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -22,13 +26,28 @@ export default function ContractsPage() {
     setLoading(true)
     try {
       const [contractData, reservationData] = await Promise.all([fetchContracts(), fetchReservations()])
-      setContracts(contractData)
-      setReservations(reservationData)
 
+      const contractMap = contractData.reduce<Record<string, Contract>>((accumulator, contract) => {
+        accumulator[contract.reservation_id] = contract
+        return accumulator
+      }, {})
+
+      const eligibleReservations = reservationData.filter((reservation) => ['reservado', 'aguardando_pagamento'].includes(reservation.status))
       const signaturesEntries = await Promise.all(
         contractData.map(async (contract) => [contract.id, await fetchSignatures(contract.id)] as const),
       )
-      setSignaturesMap(Object.fromEntries(signaturesEntries))
+      const signaturesMap = Object.fromEntries(signaturesEntries)
+
+      setRows(
+        eligibleReservations.map((reservation) => {
+          const contract = contractMap[reservation.id] ?? null
+          return {
+            reservation,
+            contract,
+            signatures: contract ? signaturesMap[contract.id] ?? [] : [],
+          }
+        }),
+      )
       setError(null)
     } catch (serviceError) {
       setError(serviceError instanceof Error ? serviceError.message : 'Erro ao carregar contratos.')
@@ -41,14 +60,7 @@ export default function ContractsPage() {
     void loadData()
   }, [])
 
-  useEffect(() => subscribeToTables(['contracts', 'signatures'], () => void loadData()), [])
-
-  const reservationMap = useMemo(() => {
-    return reservations.reduce<Record<string, Reservation>>((accumulator, reservation) => {
-      accumulator[reservation.id] = reservation
-      return accumulator
-    }, {})
-  }, [reservations])
+  useEffect(() => subscribeToTables(['contracts', 'signatures', 'reservations'], () => void loadData()), [])
 
   async function handleGenerateContract(reservationId: string) {
     setGeneratingFor(reservationId)
@@ -65,8 +77,6 @@ export default function ContractsPage() {
       setGeneratingFor(null)
     }
   }
-
-
 
   async function handleAdminSignature(contractId: string) {
     setSigningFor(contractId)
@@ -97,33 +107,40 @@ export default function ContractsPage() {
       <div className="card table-card">
         {loading ? (
           <p>Carregando contratos...</p>
-        ) : contracts.length === 0 ? (
-          <p>Nenhum contrato gerado.</p>
+        ) : rows.length === 0 ? (
+          <p>Nenhuma reserva apta para contrato ainda.</p>
         ) : (
           <table>
             <thead>
               <tr>
                 <th>Evento</th>
                 <th>Cliente</th>
-                <th>Versão</th>
-                <th>Status</th>
+                <th>Reserva</th>
+                <th>Contrato</th>
                 <th>Assinaturas</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {contracts.map((contract) => {
-                const reservation = reservationMap[contract.reservation_id]
-                const signatures = signaturesMap[contract.id] ?? []
+              {rows.map(({ reservation, contract, signatures }) => {
                 const hasClientSignature = signatures.some((item) => item.signer_role === 'client')
                 const hasAdminSignature = signatures.some((item) => item.signer_role === 'admin')
                 return (
-                  <tr key={contract.id}>
-                    <td>{reservation ? formatDate(reservation.event_date) : '-'}</td>
-                    <td>{reservation?.customer_name ?? '-'}</td>
-                    <td>{contract.version}</td>
+                  <tr key={reservation.id}>
+                    <td>{formatDate(reservation.event_date)}</td>
+                    <td>{reservation.customer_name}</td>
                     <td>
-                      <StatusBadge status={contract.status} />
+                      <StatusBadge status={reservation.status} />
+                    </td>
+                    <td>
+                      {contract ? (
+                        <div className="stack-list">
+                          <span>Versão {contract.version}</span>
+                          <StatusBadge status={contract.status} />
+                        </div>
+                      ) : (
+                        <span className="table-helper">Ainda não gerado</span>
+                      )}
                     </td>
                     <td>
                       <div className="stack-list">
@@ -143,12 +160,13 @@ export default function ContractsPage() {
                         <button
                           className="button button-secondary"
                           type="button"
-                          onClick={() => void handleGenerateContract(contract.reservation_id)}
-                          disabled={generatingFor === contract.reservation_id}
+                          onClick={() => void handleGenerateContract(reservation.id)}
+                          disabled={generatingFor === reservation.id}
                         >
-                          {generatingFor === contract.reservation_id ? 'Gerando...' : 'Regenerar'}
+                          {generatingFor === reservation.id ? 'Gerando...' : contract ? 'Regenerar' : 'Gerar contrato'}
                         </button>
-                        {hasClientSignature && !hasAdminSignature ? (
+
+                        {contract && hasClientSignature && !hasAdminSignature ? (
                           <button
                             className="button button-secondary"
                             type="button"
@@ -158,13 +176,14 @@ export default function ContractsPage() {
                             {signingFor === contract.id ? 'Assinando...' : 'Assinar admin'}
                           </button>
                         ) : null}
-                        {contract.file_path ? (
-                          <a href={contract.file_path} target="_blank" rel="noreferrer">
-                            Abrir
+
+                        {contract?.file_path ? (
+                          <a className="button button-secondary" href={contract.file_path} target="_blank" rel="noreferrer">
+                            Abrir arquivo
                           </a>
-                        ) : (
-                          '-'
-                        )}
+                        ) : contract?.html_content ? (
+                          <span className="table-helper">Prévia HTML pronta</span>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

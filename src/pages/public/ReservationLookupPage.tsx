@@ -108,7 +108,7 @@ export default function ReservationLookupPage() {
                   <div>
                     <strong>{formatCurrency(payment.amount)}</strong>
                     <p>
-                      {payment.provider ?? 'Sem provedor'} • {payment.provider_reference ?? 'Sem referência'}
+                      {(payment as any).payment_method_label ?? payment.provider ?? 'Sem provedor'} • {payment.provider_reference ?? 'Sem referência'}
                     </p>
                   </div>
                   <StatusBadge status={payment.status} />

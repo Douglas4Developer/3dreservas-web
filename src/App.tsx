@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AdminLayout from './components/layout/AdminLayout'
 import PublicLayout from './components/layout/PublicLayout'
+import CalendarPage from './pages/admin/CalendarPage'
 import ContractsPage from './pages/admin/ContractsPage'
 import DashboardPage from './pages/admin/DashboardPage'
 import LeadsPage from './pages/admin/LeadsPage'
@@ -37,6 +38,7 @@ export default function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<DashboardPage />} />
+            <Route path="calendario" element={<CalendarPage />} />
             <Route path="leads" element={<LeadsPage />} />
             <Route path="reservas" element={<ReservationsPage />} />
             <Route path="contratos" element={<ContractsPage />} />

@@ -98,6 +98,8 @@ export default function MediaPage() {
     <div className="stack-lg">
       <PageHeader title="Mídia do espaço" description="Gerencie fotos, vídeos, ordem de exibição e itens em destaque da vitrine pública." />
 
+      <div className="alert alert-success">As imagens e vídeos só aparecem na galeria quando existe um registro na tabela <strong>space_media</strong>. Subir arquivo direto no bucket não basta.</div>
+
       {error ? <div className="alert alert-error">{error}</div> : null}
       {success ? <div className="alert alert-success">{success}</div> : null}
 

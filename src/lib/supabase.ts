@@ -18,7 +18,19 @@ export async function invokeEdgeFunction<TResponse = unknown>(
     throw new Error('Supabase não configurado para invocar Edge Functions.')
   }
 
-  const { data, error } = await supabase.functions.invoke(functionName, options)
+  const { data: sessionData } = await supabase.auth.getSession()
+  const accessToken = sessionData.session?.access_token
+  const headers = new Headers(options?.headers ?? {})
+
+  if (accessToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    ...options,
+    headers,
+  })
+
   if (error) throw error
   return data as TResponse
 }

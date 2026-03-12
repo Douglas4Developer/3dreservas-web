@@ -5,6 +5,7 @@ import { formatCountdown, formatCurrency, formatDate } from '../../lib/format'
 import { subscribeToTables } from '../../lib/realtime'
 import { getDefaultSpaceId } from '../../services/leads.service'
 import { createPaymentOrder, fetchPaymentOrders } from '../../services/payment-orders.service'
+import { confirmManualPayment } from '../../services/payments.service'
 import { createReservation, fetchReservations } from '../../services/reservations.service'
 import type { PaymentOrder, Reservation, ReservationStatus } from '../../types/database'
 
@@ -24,6 +25,7 @@ export default function ReservationsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [creatingPaymentFor, setCreatingPaymentFor] = useState<string | null>(null)
+  const [confirmingManualFor, setConfirmingManualFor] = useState<string | null>(null)
   const [form, setForm] = useState({
     customer_name: '',
     customer_phone: '',
@@ -58,7 +60,7 @@ export default function ReservationsPage() {
     void loadData()
   }, [])
 
-  useEffect(() => subscribeToTables(['reservations', 'payment_orders'], () => void loadData()), [])
+  useEffect(() => subscribeToTables(['reservations', 'payment_orders', 'payments', 'contracts'], () => void loadData()), [])
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -104,6 +106,9 @@ export default function ReservationsPage() {
     setSuccess(null)
     try {
       const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
+      if (!amount) {
+        throw new Error('Defina o valor da entrada ou o valor total antes de gerar checkout.')
+      }
       const result = await createPaymentOrder({
         reservationId: reservation.id,
         amount,
@@ -116,6 +121,37 @@ export default function ReservationsPage() {
       setError(serviceError instanceof Error ? serviceError.message : 'Erro ao criar checkout.')
     } finally {
       setCreatingPaymentFor(null)
+    }
+  }
+
+  async function handleConfirmManualPayment(reservation: Reservation) {
+    const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
+    if (!amount) {
+      setError('Defina o valor da entrada ou o valor total antes de confirmar pagamento manual.')
+      return
+    }
+
+    const confirmationNotes = window.prompt('Observação do pagamento manual (opcional):') ?? ''
+    const paymentMethodLabel = window.prompt('Método manual (ex: pix_manual, dinheiro, transferência):', 'pix_manual') ?? 'pix_manual'
+
+    setConfirmingManualFor(reservation.id)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const result = await confirmManualPayment({
+        reservationId: reservation.id,
+        amount,
+        paymentMethodLabel,
+        confirmationNotes,
+      })
+
+      setSuccess(`Pagamento manual confirmado. Contrato liberado. Link do cliente: ${result.statusUrl}`)
+      await loadData()
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao confirmar pagamento manual.')
+    } finally {
+      setConfirmingManualFor(null)
     }
   }
 
@@ -205,6 +241,7 @@ export default function ReservationsPage() {
               <tbody>
                 {reservations.map((reservation) => {
                   const paymentOrder = paymentOrdersMap[reservation.id]
+                  const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
                   return (
                     <tr key={reservation.id}>
                       <td>
@@ -231,11 +268,21 @@ export default function ReservationsPage() {
                           <button
                             className="button button-secondary"
                             type="button"
+                            onClick={() => void handleConfirmManualPayment(reservation)}
+                            disabled={confirmingManualFor === reservation.id || !amount || reservation.status === 'reservado'}
+                          >
+                            {confirmingManualFor === reservation.id ? 'Confirmando...' : 'Confirmar entrada manual'}
+                          </button>
+
+                          <button
+                            className="button button-secondary"
+                            type="button"
                             onClick={() => void handleCreatePaymentOrder(reservation)}
-                            disabled={creatingPaymentFor === reservation.id || !(reservation.entry_amount ?? reservation.total_amount)}
+                            disabled={creatingPaymentFor === reservation.id || !amount || reservation.status === 'reservado'}
                           >
                             {creatingPaymentFor === reservation.id ? 'Gerando...' : 'Gerar checkout'}
                           </button>
+
                           <a className="button button-secondary" href={`/minha-reserva/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
                             Link do cliente
                           </a>

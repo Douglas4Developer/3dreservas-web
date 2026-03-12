@@ -80,6 +80,9 @@ export interface Payment {
   provider: string | null
   provider_reference: string | null
   paid_at: string | null
+  payment_method_label?: string | null
+  confirmed_by?: string | null
+  confirmation_notes?: string | null
   created_at: string
   updated_at: string
 }
