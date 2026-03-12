@@ -1,9 +1,17 @@
-import { useEffect, useState } from 'react'
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatCountdown, formatCurrency, formatDate, formatDateTime } from '../../lib/format'
 import { fetchReservationLookupByToken } from '../../services/reservations.service'
-import type { ReservationLookup } from '../../types/database'
+import type { ReservationLookup, Payment } from '../../types/database'
+
+function getPaymentMethodLabel(payment: Payment) {
+  if (payment.payment_method_type === 'bank_transfer') return 'Pix'
+  if (payment.payment_method_type === 'credit_card') return 'Cartão de crédito'
+  if (payment.payment_method_type === 'debit_card') return 'Cartão de débito'
+  return payment.payment_method_label ?? payment.provider ?? '-'
+}
 
 export default function ReservationLookupPage() {
   const { token = '' } = useParams()
@@ -21,6 +29,12 @@ export default function ReservationLookupPage() {
       .catch((serviceError) => setError(serviceError.message || 'Erro ao consultar a reserva.'))
       .finally(() => setLoading(false))
   }, [token])
+
+  const latestPaidPayment = useMemo(() => {
+    if (!lookup?.payments?.length) return null
+    return [...lookup.payments]
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
+  }, [lookup])
 
   if (loading) {
     return (
@@ -77,22 +91,43 @@ export default function ReservationLookupPage() {
 
         <article className="card details-card">
           <h2>Checkout da entrada</h2>
+
           {lookup.activePaymentOrder ? (
             <div className="stack-list">
               <div className="line-card">
                 <div>
                   <strong>{formatCurrency(lookup.activePaymentOrder.amount)}</strong>
                   <p>Expira em {formatCountdown(lookup.activePaymentOrder.expires_at)}</p>
+                  <p>
+                    Tipo de checkout:{' '}
+                    {lookup.activePaymentOrder.checkout_type === 'pix'
+                      ? 'Pix'
+                      : lookup.activePaymentOrder.checkout_type === 'card'
+                        ? 'Cartão'
+                        : 'Pix ou cartão'}
+                  </p>
                 </div>
                 <StatusBadge status={lookup.activePaymentOrder.status} />
               </div>
+
               {lookup.activePaymentOrder.checkout_url ? (
-                <a className="button" href={lookup.activePaymentOrder.checkout_url} target="_blank" rel="noreferrer">
+                <a
+                  className="button"
+                  href={lookup.activePaymentOrder.checkout_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Ir para o pagamento
                 </a>
               ) : (
                 <p>O link de pagamento ainda está sendo preparado.</p>
               )}
+            </div>
+          ) : latestPaidPayment ? (
+            <div className="alert alert-success">
+              Entrada já confirmada.
+              <br />
+              Método: {getPaymentMethodLabel(latestPaidPayment)}
             </div>
           ) : (
             <p>Nenhum checkout pendente para esta reserva.</p>
@@ -108,7 +143,10 @@ export default function ReservationLookupPage() {
                   <div>
                     <strong>{formatCurrency(payment.amount)}</strong>
                     <p>
-                      {(payment as any).payment_method_label ?? payment.provider ?? 'Sem provedor'} • {payment.provider_reference ?? 'Sem referência'}
+                      Método: {getPaymentMethodLabel(payment)}
+                    </p>
+                    <p>
+                      Referência: {payment.provider_reference ?? 'Sem referência'}
                     </p>
                   </div>
                   <StatusBadge status={payment.status} />
@@ -127,8 +165,14 @@ export default function ReservationLookupPage() {
                 </div>
                 <StatusBadge status={lookup.contract.status} />
               </div>
+
               {lookup.contract.file_path ? (
-                <a className="button button-secondary" href={lookup.contract.file_path} target="_blank" rel="noreferrer">
+                <a
+                  className="button button-secondary"
+                  href={lookup.contract.file_path}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Abrir contrato
                 </a>
               ) : (

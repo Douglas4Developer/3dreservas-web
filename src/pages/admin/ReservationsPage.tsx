@@ -100,29 +100,37 @@ export default function ReservationsPage() {
     }
   }
 
-  async function handleCreatePaymentOrder(reservation: Reservation) {
-    setCreatingPaymentFor(reservation.id)
-    setError(null)
-    setSuccess(null)
-    try {
-      const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
-      if (!amount) {
-        throw new Error('Defina o valor da entrada ou o valor total antes de gerar checkout.')
-      }
-      const result = await createPaymentOrder({
-        reservationId: reservation.id,
-        amount,
-        expiresInMinutes: 60,
-        title: `Entrada reserva ${reservation.event_date}`,
-      })
-      setSuccess(result.paymentUrl ? `Checkout criado com sucesso: ${result.paymentUrl}` : 'Checkout criado com sucesso.')
-      await loadData()
-    } catch (serviceError) {
-      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao criar checkout.')
-    } finally {
-      setCreatingPaymentFor(null)
-    }
+async function handleCreatePaymentOrder(
+  reservation: Reservation,
+  checkoutType: 'all' | 'pix' | 'card',
+) {
+  setCreatingPaymentFor(`${reservation.id}-${checkoutType}`)
+  setError(null)
+  setSuccess(null)
+
+  try {
+    const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
+    const result = await createPaymentOrder({
+      reservationId: reservation.id,
+      amount,
+      expiresInMinutes: 60,
+      title: `Entrada reserva ${reservation.event_date}`,
+      checkoutType,
+    })
+
+    setSuccess(
+      result.paymentUrl
+        ? `Checkout ${checkoutType === 'pix' ? 'Pix' : checkoutType === 'card' ? 'Cartão' : 'completo'} criado: ${result.paymentUrl}`
+        : 'Checkout criado com sucesso.',
+    )
+
+    await loadData()
+  } catch (serviceError) {
+    setError(serviceError instanceof Error ? serviceError.message : 'Erro ao criar checkout.')
+  } finally {
+    setCreatingPaymentFor(null)
   }
+}
 
   async function handleConfirmManualPayment(reservation: Reservation) {
     const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
@@ -241,7 +249,7 @@ export default function ReservationsPage() {
               <tbody>
                 {reservations.map((reservation) => {
                   const paymentOrder = paymentOrdersMap[reservation.id]
-                  const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
+                  //const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
                   return (
                     <tr key={reservation.id}>
                       <td>
@@ -269,7 +277,7 @@ export default function ReservationsPage() {
                             className="button button-secondary"
                             type="button"
                             onClick={() => void handleConfirmManualPayment(reservation)}
-                            disabled={confirmingManualFor === reservation.id || !amount || reservation.status === 'reservado'}
+                            disabled={confirmingManualFor === reservation.id || !(reservation.entry_amount ?? reservation.total_amount)}
                           >
                             {confirmingManualFor === reservation.id ? 'Confirmando...' : 'Confirmar entrada manual'}
                           </button>
@@ -277,13 +285,27 @@ export default function ReservationsPage() {
                           <button
                             className="button button-secondary"
                             type="button"
-                            onClick={() => void handleCreatePaymentOrder(reservation)}
-                            disabled={creatingPaymentFor === reservation.id || !amount || reservation.status === 'reservado'}
+                            onClick={() => void handleCreatePaymentOrder(reservation, 'pix')}
+                            disabled={creatingPaymentFor === `${reservation.id}-pix` || !(reservation.entry_amount ?? reservation.total_amount)}
                           >
-                            {creatingPaymentFor === reservation.id ? 'Gerando...' : 'Gerar checkout'}
+                            {creatingPaymentFor === `${reservation.id}-pix` ? 'Gerando Pix...' : 'Gerar Pix'}
                           </button>
 
-                          <a className="button button-secondary" href={`/minha-reserva/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
+                          <button
+                            className="button button-secondary"
+                            type="button"
+                            onClick={() => void handleCreatePaymentOrder(reservation, 'card')}
+                            disabled={creatingPaymentFor === `${reservation.id}-card` || !(reservation.entry_amount ?? reservation.total_amount)}
+                          >
+                            {creatingPaymentFor === `${reservation.id}-card` ? 'Gerando cartão...' : 'Gerar Cartão'}
+                          </button>
+
+                          <a
+                            className="button button-secondary"
+                            href={`/minha-reserva/${reservation.public_link_token}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
                             Link do cliente
                           </a>
                         </div>

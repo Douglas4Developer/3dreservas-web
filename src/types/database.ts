@@ -1,5 +1,7 @@
 export type LeadStatus = 'novo' | 'em_contato' | 'proposta_enviada' | 'convertido' | 'perdido'
 
+export type CheckoutType = 'all' | 'pix' | 'card'
+
 export type ReservationStatus =
   | 'interesse_enviado'
   | 'bloqueio_temporario'
@@ -85,6 +87,8 @@ export interface Payment {
   confirmation_notes?: string | null
   created_at: string
   updated_at: string
+  payment_method_type?: string | null
+  payment_method_id?: string | null
 }
 
 export interface Contract {
@@ -118,6 +122,8 @@ export interface PaymentOrder {
   created_by?: string | null
   created_at: string
   updated_at: string
+  checkout_type?: CheckoutType
+  provider_payment_id?: string | null
 }
 
 export interface PaymentEvent {
