@@ -20,15 +20,15 @@ export async function invokeEdgeFunction<TResponse = unknown>(
 
   const { data: sessionData } = await supabase.auth.getSession()
   const accessToken = sessionData.session?.access_token
-  const headers = new Headers(options?.headers ?? {})
+  const headersObj: { [key: string]: string } = options?.headers ?? {}
 
-  if (accessToken && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${accessToken}`)
+  if (accessToken && !headersObj.Authorization) {
+    headersObj.Authorization = `Bearer ${accessToken}`
   }
 
   const { data, error } = await supabase.functions.invoke(functionName, {
     ...options,
-    headers,
+    headers: headersObj,
   })
 
   if (error) throw error

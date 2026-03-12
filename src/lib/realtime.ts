@@ -20,6 +20,8 @@ export function subscribeToTables(tables: string[], onChange: () => void) {
   channel.subscribe()
 
   return () => {
-    void supabase.removeChannel(channel)
+    if (supabase) {
+      void supabase.removeChannel(channel)
+    }
   }
 }
