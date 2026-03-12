@@ -1,6 +1,6 @@
-import { Dayjs }  from 'dayjs';
 import { useMemo } from 'react'
-import type { CalendarDay } from '../../types/database';
+import type { Dayjs } from 'dayjs'
+import type { CalendarDay } from '../../types/database'
 
 function buildMonthMatrix(referenceDate: Dayjs) {
   const startOfMonth = referenceDate.startOf('month')
