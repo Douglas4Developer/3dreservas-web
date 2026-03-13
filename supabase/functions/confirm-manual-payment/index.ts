@@ -10,7 +10,7 @@ import {
   requireAuthenticatedUser,
 } from '../_shared/index.ts'
 
-serve(async (req: Request) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
@@ -39,10 +39,7 @@ serve(async (req: Request) => {
 
     await adminClient
       .from('payment_orders')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
       .eq('reservation_id', reservationId)
       .eq('status', 'pending')
 
@@ -60,10 +57,10 @@ serve(async (req: Request) => {
         status: 'pago',
         provider: 'manual',
         provider_reference: `manual-${Date.now()}`,
+        payment_method_label: paymentMethodLabel,
         paid_at: new Date().toISOString(),
         confirmed_by: auth.user?.id ?? null,
         confirmation_notes: confirmationNotes,
-        payment_method_label: paymentMethodLabel,
         updated_at: new Date().toISOString(),
       }).eq('id', existingPayment.id)
     } else {
@@ -73,10 +70,10 @@ serve(async (req: Request) => {
         status: 'pago',
         provider: 'manual',
         provider_reference: `manual-${Date.now()}`,
+        payment_method_label: paymentMethodLabel,
         paid_at: new Date().toISOString(),
         confirmed_by: auth.user?.id ?? null,
         confirmation_notes: confirmationNotes,
-        payment_method_label: paymentMethodLabel,
       })
     }
 
@@ -110,7 +107,6 @@ serve(async (req: Request) => {
         template_key: 'default_v1',
         updated_at: new Date().toISOString(),
       }).eq('id', existingContract.id).select('*').single()
-
       contract = data
     } else {
       const { data } = await adminClient.from('contracts').insert({
@@ -123,7 +119,6 @@ serve(async (req: Request) => {
         document_hash: documentHash,
         template_key: 'default_v1',
       }).select('*').single()
-
       contract = data
     }
 

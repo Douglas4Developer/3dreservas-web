@@ -1,7 +1,5 @@
 export type LeadStatus = 'novo' | 'em_contato' | 'proposta_enviada' | 'convertido' | 'perdido'
 
-export type CheckoutType = 'all' | 'pix' | 'card'
-
 export type ReservationStatus =
   | 'interesse_enviado'
   | 'bloqueio_temporario'
@@ -18,14 +16,12 @@ export type ContractStatus =
   | 'assinado'
   | 'cancelado'
 
-export type PaymentOrderStatus = 'pending' | 'paid' | 'expired' | 'failed' | 'cancelled'
+export type PaymentOrderStatus = 'pending' | 'approved' | 'paid' | 'expired' | 'failed' | 'cancelled'
+export type CheckoutType = 'all' | 'pix' | 'card'
 
 export type SecureLinkType = 'proposal' | 'contract_view' | 'contract_sign' | 'status' | 'payment'
-
 export type SignerRole = 'client' | 'admin'
-
 export type WhatsappMessageStatus = 'queued' | 'sent' | 'failed'
-
 export type SpaceMediaType = 'image' | 'video'
 
 export interface Space {
@@ -58,12 +54,20 @@ export interface Reservation {
   customer_name: string
   customer_phone: string
   customer_email: string | null
+  customer_document?: string | null
+  customer_address?: string | null
+  event_type?: string | null
   event_date: string
   period_start: string
   period_end: string
   guests_expected: number | null
   total_amount: number | null
   entry_amount: number | null
+  remaining_amount?: number | null
+  cleaning_fee?: number | null
+  image_use_authorized?: boolean | null
+  venue_address_snapshot?: string | null
+  capacity_snapshot?: number | null
   entry_due_at: string | null
   expires_at: string | null
   status: ReservationStatus
@@ -83,12 +87,12 @@ export interface Payment {
   provider_reference: string | null
   paid_at: string | null
   payment_method_label?: string | null
+  payment_method_type?: string | null
+  payment_method_id?: string | null
   confirmed_by?: string | null
   confirmation_notes?: string | null
   created_at: string
   updated_at: string
-  payment_method_type?: string | null
-  payment_method_id?: string | null
 }
 
 export interface Contract {
@@ -103,6 +107,11 @@ export interface Contract {
   generated_at?: string | null
   released_at?: string | null
   document_hash?: string | null
+  lessor_name?: string | null
+  lessor_document?: string | null
+  lessor_address?: string | null
+  forum_city?: string | null
+  contract_terms_json?: Record<string, unknown> | null
   signed_at: string | null
   created_at: string
   updated_at: string
@@ -113,17 +122,18 @@ export interface PaymentOrder {
   reservation_id: string
   provider: string
   provider_external_id: string | null
+  provider_payment_id?: string | null
   checkout_url: string | null
+  checkout_type?: CheckoutType
   pix_qr_code: string | null
   pix_copy_paste: string | null
+  qr_code_base64?: string | null
   amount: number
   status: PaymentOrderStatus
   expires_at: string
   created_by?: string | null
   created_at: string
   updated_at: string
-  checkout_type?: CheckoutType
-  provider_payment_id?: string | null
 }
 
 export interface PaymentEvent {
@@ -212,6 +222,11 @@ export interface DashboardSummary {
   occupancyRate: number
   activePaymentOrders: number
   mediaItems: number
+  projectedRevenue: number
+  confirmedRevenue: number
+  averageTicket: number
+  availableDays: number
+  bookedDays: number
 }
 
 export interface CalendarDay {
@@ -232,12 +247,27 @@ export interface CreateReservationInput {
   customer_name: string
   customer_phone: string
   customer_email?: string
+  customer_document?: string
+  customer_address?: string
+  event_type?: string
   event_date: string
+  period_start?: string
+  period_end?: string
+  guests_expected?: number
   total_amount?: number
   entry_amount?: number
+  remaining_amount?: number
+  cleaning_fee?: number
+  image_use_authorized?: boolean
+  venue_address_snapshot?: string
+  capacity_snapshot?: number
   status?: ReservationStatus
   notes?: string
   space_id: string
+}
+
+export interface UpdateReservationInput extends Partial<CreateReservationInput> {
+  id: string
 }
 
 export interface CreatePaymentOrderInput {
@@ -245,6 +275,14 @@ export interface CreatePaymentOrderInput {
   amount: number
   expiresInMinutes?: number
   title?: string
+  checkoutType?: CheckoutType
+}
+
+export interface CreatePixPaymentInput {
+  reservationId: string
+  amount: number
+  expiresInMinutes?: number
+  description?: string
 }
 
 export interface CreateSignatureInput {
@@ -259,6 +297,7 @@ export interface UpsertSpaceMediaInput {
   type: SpaceMediaType
   title: string
   description?: string
+  storage_path?: string
   external_url?: string
   thumbnail_path?: string
   display_order?: number

@@ -1,6 +1,6 @@
 import { mockLookupByToken, mockReservations, mockSpace } from '../lib/mock'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import type { CreateReservationInput, Reservation, ReservationLookup } from '../types/database'
+import type { CreateReservationInput, Reservation, ReservationLookup, UpdateReservationInput } from '../types/database'
 
 export async function fetchReservations(): Promise<Reservation[]> {
   if (!isSupabaseConfigured || !supabase) return mockReservations
@@ -10,17 +10,52 @@ export async function fetchReservations(): Promise<Reservation[]> {
   return (data ?? []) as Reservation[]
 }
 
+function mapReservationPayload(input: Partial<CreateReservationInput>) {
+  return {
+    space_id: input.space_id || mockSpace.id,
+    customer_name: input.customer_name,
+    customer_phone: input.customer_phone,
+    customer_email: input.customer_email ?? null,
+    customer_document: input.customer_document ?? null,
+    customer_address: input.customer_address ?? null,
+    event_type: input.event_type ?? null,
+    event_date: input.event_date,
+    period_start: input.period_start ?? '09:00',
+    period_end: input.period_end ?? '23:00',
+    guests_expected: input.guests_expected ?? null,
+    total_amount: input.total_amount ?? null,
+    entry_amount: input.entry_amount ?? null,
+    remaining_amount:
+      input.remaining_amount ??
+      (input.total_amount != null && input.entry_amount != null ? input.total_amount - input.entry_amount : null),
+    cleaning_fee: input.cleaning_fee ?? 100,
+    image_use_authorized: input.image_use_authorized ?? true,
+    venue_address_snapshot: input.venue_address_snapshot ?? 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia - GO',
+    capacity_snapshot: input.capacity_snapshot ?? 100,
+    status: input.status ?? 'interesse_enviado',
+    notes: input.notes ?? null,
+  }
+}
+
 export async function createReservation(input: CreateReservationInput): Promise<Reservation> {
   if (!isSupabaseConfigured || !supabase) {
     return {
       id: `res-${Date.now()}`,
       lead_id: null,
       customer_email: input.customer_email ?? null,
-      period_start: '09:00',
-      period_end: '23:00',
-      guests_expected: null,
+      customer_document: input.customer_document ?? null,
+      customer_address: input.customer_address ?? null,
+      event_type: input.event_type ?? null,
+      period_start: input.period_start ?? '09:00',
+      period_end: input.period_end ?? '23:00',
+      guests_expected: input.guests_expected ?? null,
       total_amount: input.total_amount ?? null,
       entry_amount: input.entry_amount ?? null,
+      remaining_amount: input.remaining_amount ?? null,
+      cleaning_fee: input.cleaning_fee ?? 100,
+      image_use_authorized: input.image_use_authorized ?? true,
+      venue_address_snapshot: input.venue_address_snapshot ?? 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia - GO',
+      capacity_snapshot: input.capacity_snapshot ?? 100,
       entry_due_at: null,
       expires_at: null,
       status: input.status ?? 'interesse_enviado',
@@ -33,19 +68,26 @@ export async function createReservation(input: CreateReservationInput): Promise<
     }
   }
 
-  const payload = {
-    space_id: input.space_id || mockSpace.id,
-    customer_name: input.customer_name,
-    customer_phone: input.customer_phone,
-    customer_email: input.customer_email ?? null,
-    event_date: input.event_date,
-    total_amount: input.total_amount ?? null,
-    entry_amount: input.entry_amount ?? null,
-    status: input.status ?? 'interesse_enviado',
-    notes: input.notes ?? null,
-  }
+  const payload = mapReservationPayload(input)
 
   const { data, error } = await supabase.from('reservations').insert(payload).select('*').single()
+  if (error) throw error
+  return data as Reservation
+}
+
+export async function updateReservation(input: UpdateReservationInput): Promise<Reservation> {
+  if (!isSupabaseConfigured || !supabase) {
+    const current = mockReservations.find((item) => item.id === input.id)
+    if (!current) throw new Error('Reserva não encontrada.')
+    return {
+      ...current,
+      ...input,
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  const payload = mapReservationPayload(input)
+  const { data, error } = await supabase.from('reservations').update(payload).eq('id', input.id).select('*').single()
   if (error) throw error
   return data as Reservation
 }

@@ -11,17 +11,6 @@ import {
   supabaseUrl,
 } from '../_shared/index.ts'
 
-type CheckoutType = 'all' | 'pix' | 'card'
-
-function buildPaymentMethods(checkoutType: CheckoutType) {
-  if (checkoutType === 'card') {
-    return {
-      excluded_payment_types: [{ id: 'bank_transfer' }, { id: 'ticket' }, { id: 'atm' }],
-    }
-  }
-  return undefined
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -36,8 +25,7 @@ serve(async (req) => {
     const body = await req.json()
     const reservationId = body.reservationId as string
     const amount = Number(body.amount)
-    const expiresInMinutes = Math.max(10, Math.min(Number(body.expiresInMinutes ?? 60), 1440))
-    const checkoutType = (body.checkoutType ?? 'card') as CheckoutType
+    const expiresInMinutes = Math.max(10, Math.min(Number(body.expiresInMinutes ?? 30), 1440))
 
     if (!reservationId || !amount || Number.isNaN(amount)) {
       return jsonResponse({ error: 'reservationId e amount são obrigatórios.' }, 400)
@@ -61,66 +49,65 @@ serve(async (req) => {
       .eq('reservation_id', reservation.id)
       .eq('status', 'pending')
 
-    const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
+    const payerEmail = reservation.customer_email || `checkout+${reservation.id}@3deventos.com`
+    const idempotencyKey = crypto.randomUUID()
+
+    const mpResponse = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${mercadoPagoToken}`,
         'Content-Type': 'application/json',
+        'X-Idempotency-Key': idempotencyKey,
       },
       body: JSON.stringify({
-        items: [
-          {
-            title: body.title ?? `Entrada da reserva ${reservation.event_date}`,
-            quantity: 1,
-            currency_id: 'BRL',
-            unit_price: amount,
-          },
-        ],
+        transaction_amount: amount,
+        description: body.description ?? `Entrada da reserva ${reservation.event_date}`,
+        payment_method_id: 'pix',
         external_reference: reservation.id,
+        notification_url: `${supabaseUrl}/functions/v1/mercado-pago-webhook`,
+        date_of_expiration: expiresAt,
+        payer: {
+          email: payerEmail,
+          first_name: reservation.customer_name?.split(' ')?.[0] ?? 'Cliente',
+          last_name: reservation.customer_name?.split(' ')?.slice(1)?.join(' ') ?? '3Deventos',
+        },
         metadata: {
           reservation_id: reservation.id,
-          checkout_type: checkoutType,
+          checkout_type: 'pix',
         },
-        payment_methods: buildPaymentMethods(checkoutType),
-        notification_url: `${supabaseUrl}/functions/v1/mercado-pago-webhook`,
-        back_urls: {
-          success: `${appUrl}/minha-reserva/${reservation.public_link_token}`,
-          pending: `${appUrl}/minha-reserva/${reservation.public_link_token}`,
-          failure: `${appUrl}/minha-reserva/${reservation.public_link_token}`,
-        },
-        auto_return: 'approved',
-        expires: true,
-        expiration_date_to: expiresAt,
       }),
     })
 
     const mpPayload = await mpResponse.json()
     if (!mpResponse.ok) {
-      return jsonResponse({ error: 'Falha ao criar preferência do Mercado Pago.', details: mpPayload }, 502)
+      return jsonResponse({ error: 'Falha ao gerar cobrança Pix.', details: mpPayload }, 502)
     }
 
-    const providerExternalId = mpPayload.id ?? null
-    const checkoutUrl = mpPayload.init_point ?? mpPayload.sandbox_init_point ?? null
+    const providerPaymentId = mpPayload.id?.toString?.() ?? null
+    const pixCopyPaste = mpPayload.point_of_interaction?.transaction_data?.qr_code ?? null
+    const qrCodeBase64 = mpPayload.point_of_interaction?.transaction_data?.qr_code_base64 ?? null
+    const qrCode = mpPayload.point_of_interaction?.transaction_data?.ticket_url ?? null
 
     const { data: paymentOrder, error: paymentOrderError } = await adminClient
       .from('payment_orders')
       .insert({
         reservation_id: reservation.id,
         provider: 'mercado_pago',
-        provider_external_id: providerExternalId,
-        checkout_url: checkoutUrl,
+        provider_external_id: providerPaymentId,
+        provider_payment_id: providerPaymentId,
         amount,
         status: 'pending',
         expires_at: expiresAt,
-        checkout_type: checkoutType,
+        checkout_type: 'pix',
+        pix_qr_code: qrCode,
+        pix_copy_paste: pixCopyPaste,
+        qr_code_base64: qrCodeBase64,
         created_by: auth.user?.id ?? null,
       })
       .select('*')
       .single()
 
-    if (paymentOrderError) {
-      return jsonResponse({ error: paymentOrderError.message }, 400)
-    }
+    if (paymentOrderError) return jsonResponse({ error: paymentOrderError.message }, 400)
 
     await adminClient.from('reservations').update({
       status: 'aguardando_pagamento',
@@ -141,8 +128,9 @@ serve(async (req) => {
       await adminClient.from('payments').update({
         amount,
         provider: 'mercado_pago',
-        provider_reference: providerExternalId,
-        payment_method_label: checkoutType === 'card' ? 'cartao_checkout' : 'mercado_pago',
+        provider_reference: providerPaymentId,
+        payment_method_label: 'pix_checkout',
+        payment_method_type: 'bank_transfer',
         updated_at: new Date().toISOString(),
       }).eq('id', openPayment.id)
     } else {
@@ -151,8 +139,9 @@ serve(async (req) => {
         amount,
         status: 'pendente',
         provider: 'mercado_pago',
-        provider_reference: providerExternalId,
-        payment_method_label: checkoutType === 'card' ? 'cartao_checkout' : 'mercado_pago',
+        provider_reference: providerPaymentId,
+        payment_method_label: 'pix_checkout',
+        payment_method_type: 'bank_transfer',
       })
     }
 
@@ -165,14 +154,14 @@ serve(async (req) => {
     await queueOrSendWhatsapp({
       reservationId: reservation.id,
       phone: reservation.customer_phone,
-      templateName: 'payment_link_card',
-      messageBody: `Olá, ${reservation.customer_name}. Seu link de pagamento por cartão do 3Deventos foi gerado: ${checkoutUrl}. Acompanhe sua reserva: ${appUrl}/minha-reserva/${statusLink.token}`,
+      templateName: 'payment_link_pix',
+      messageBody: `Olá, ${reservation.customer_name}. Seu Pix do 3Deventos foi gerado. Acompanhe a reserva em ${appUrl}/minha-reserva/${statusLink.token}`,
     })
 
     return jsonResponse({
       paymentOrder,
-      paymentUrl: checkoutUrl,
-      checkoutType,
+      pixCopyPaste,
+      qrCodeBase64,
     })
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : 'Erro interno.' }, 500)

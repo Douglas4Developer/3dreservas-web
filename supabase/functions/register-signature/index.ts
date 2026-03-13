@@ -52,7 +52,7 @@ serve(async (req) => {
         .from('payment_orders')
         .select('*')
         .eq('reservation_id', contract.reservation_id)
-        .eq('status', 'paid')
+        .in('status', ['paid', 'approved'])
         .limit(1)
         .maybeSingle()
 

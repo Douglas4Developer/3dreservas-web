@@ -7,7 +7,7 @@ function sortMedia(items: SpaceMedia[]) {
   return [...items].sort((a, b) => a.display_order - b.display_order)
 }
 
-async function resolveDefaultSpaceId(spaceId?: string) {
+export async function resolveDefaultSpaceId(spaceId?: string) {
   if (spaceId) return spaceId
   if (!isSupabaseConfigured || !supabase) return mockSpace.id
 
@@ -66,9 +66,9 @@ export async function fetchAdminMedia(spaceId?: string): Promise<SpaceMedia[]> {
 export async function saveExternalMedia(input: UpsertSpaceMediaInput): Promise<SpaceMedia> {
   if (!isSupabaseConfigured || !supabase) {
     return {
-      id: `media-${Date.now()}`,
+      id: input.id ?? `media-${Date.now()}`,
       description: input.description ?? null,
-      storage_path: null,
+      storage_path: input.storage_path ?? null,
       external_url: input.external_url ?? null,
       thumbnail_path: input.thumbnail_path ?? null,
       display_order: input.display_order ?? 0,
@@ -93,12 +93,18 @@ export async function saveExternalMedia(input: UpsertSpaceMediaInput): Promise<S
   if (input.id) {
     const { data, error } = await supabase.from('space_media').update(payload).eq('id', input.id).select('*').single()
     if (error) throw error
-    return data as SpaceMedia
+    return {
+      ...(data as SpaceMedia),
+      external_url: (data as SpaceMedia).external_url ?? resolveMediaUrl(data as SpaceMedia),
+    }
   }
 
   const { data, error } = await supabase.from('space_media').insert(payload).select('*').single()
   if (error) throw error
-  return data as SpaceMedia
+  return {
+    ...(data as SpaceMedia),
+    external_url: (data as SpaceMedia).external_url ?? resolveMediaUrl(data as SpaceMedia),
+  }
 }
 
 export async function uploadImageMedia(params: {
@@ -158,4 +164,15 @@ export async function uploadImageMedia(params: {
 
   if (error) throw error
   return data as SpaceMedia
+}
+
+export async function deleteMedia(item: SpaceMedia) {
+  if (!isSupabaseConfigured || !supabase) return
+
+  if (item.storage_path) {
+    await supabase.storage.from('space-media').remove([item.storage_path])
+  }
+
+  const { error } = await supabase.from('space_media').delete().eq('id', item.id)
+  if (error) throw error
 }

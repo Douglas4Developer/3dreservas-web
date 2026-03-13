@@ -35,6 +35,7 @@ const statusLabelMap: Record<SupportedStatus, string> = {
   liberado_assinatura: 'Aguardando assinatura',
   assinado: 'Assinado',
   pending: 'Checkout pendente',
+  approved: 'Pagamento aprovado',
   paid: 'Checkout pago',
   expired: 'Expirado',
   failed: 'Falhou',

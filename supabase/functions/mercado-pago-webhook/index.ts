@@ -50,11 +50,7 @@ serve(async (req) => {
     const url = new URL(req.url)
     const payload = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
 
-    const eventType =
-      url.searchParams.get('type') ??
-      payload?.type ??
-      payload?.action ??
-      'unknown'
+    const eventType = url.searchParams.get('type') ?? payload?.type ?? payload?.action ?? 'unknown'
 
     const incomingPaymentId =
       url.searchParams.get('data.id') ??
@@ -89,10 +85,7 @@ serve(async (req) => {
     const paymentMethodId = paymentData.payment_method_id ?? null
     const status = paymentData.status ?? 'pending'
 
-    const reservationId =
-      paymentData.external_reference ??
-      paymentData.metadata?.reservation_id ??
-      null
+    const reservationId = paymentData.external_reference ?? paymentData.metadata?.reservation_id ?? null
 
     if (!reservationId) {
       return jsonResponse({ received: true, ignored: true, reason: 'reservation_not_found' })
@@ -122,6 +115,7 @@ serve(async (req) => {
         .update({
           status: mapPaymentOrderStatus(status),
           provider_payment_id: paymentId,
+          provider_external_id: paymentOrder.provider_external_id ?? paymentId,
           updated_at: new Date().toISOString(),
         })
         .eq('id', paymentOrder.id)
@@ -175,7 +169,6 @@ serve(async (req) => {
       }
 
       const html = buildContractHtml(reservation)
-
       const documentHash = await crypto.subtle
         .digest('SHA-256', new TextEncoder().encode(html))
         .then((buffer) =>
@@ -277,8 +270,7 @@ serve(async (req) => {
           phone: reservation.customer_phone,
           templateName: 'payment_failed',
           messageBody:
-            'O pagamento da entrada não foi concluído e a data voltou a ficar disponível. ' +
-            'Fale com o 3Deventos para reabrir a proposta.',
+            'O pagamento da entrada não foi concluído e a data voltou a ficar disponível. Fale com o 3Deventos para reabrir a proposta.',
         })
       }
     }
