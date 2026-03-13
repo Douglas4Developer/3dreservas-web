@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatCountdown, formatCurrency, formatDate, formatDateTime } from '../../lib/format'
@@ -19,7 +19,7 @@ export default function ReservationLookupPage() {
   const [loading, setLoading] = useState(true)
   const [lookup, setLookup] = useState<ReservationLookup | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  //const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -32,17 +32,17 @@ export default function ReservationLookupPage() {
       .finally(() => setLoading(false))
   }, [token])
 
-  const latestPayment = useMemo(() => {
-    if (!lookup?.payments?.length) return null
-    return [...lookup.payments].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
-  }, [lookup])
+  // const latestPayment = useMemo(() => {
+  //   if (!lookup?.payments?.length) return null
+  //   return [...lookup.payments].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
+  // }, [lookup])
 
-  async function copyPixCode(code?: string | null) {
-    if (!code) return
-    await navigator.clipboard.writeText(code)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1800)
-  }
+  // async function copyPixCode(code?: string | null) {
+  //   if (!code) return
+  //   await navigator.clipboard.writeText(code)
+  //   setCopied(true)
+  //   window.setTimeout(() => setCopied(false), 1800)
+  // }
 
   if (loading) {
     return (
@@ -64,8 +64,8 @@ export default function ReservationLookupPage() {
     )
   }
 
-  const activeOrder = lookup.activePaymentOrder
-  const activeOrderIsPix = activeOrder?.checkout_type === 'pix'
+  //const activeOrder = lookup.activePaymentOrder
+  //const activeOrderIsPix = activeOrder?.checkout_type === 'pix'
 
   return (
     <section className="section-block">
