@@ -230,15 +230,20 @@ export default function ReservationsPage() {
     window.setTimeout(() => setCopiedPixCode(false), 1800)
   }
 
-  const paymentOrdersMap = useMemo(() => {
-    return paymentOrders.reduce<Record<string, PaymentOrder>>((accumulator, item) => {
-      const current = accumulator[item.reservation_id]
-      if (!current || current.created_at < item.created_at) {
+const paymentOrdersMap = useMemo(() => {
+  return paymentOrders
+    .filter((item) => item.status === 'pending')
+    .reduce<Record<string, PaymentOrder>>((accumulator, item) => {
+      if (
+        !accumulator[item.reservation_id] ||
+        accumulator[item.reservation_id].created_at < item.created_at
+      ) {
         accumulator[item.reservation_id] = item
       }
+
       return accumulator
     }, {})
-  }, [paymentOrders])
+}, [paymentOrders])
 
   return (
     <div className="stack-lg">

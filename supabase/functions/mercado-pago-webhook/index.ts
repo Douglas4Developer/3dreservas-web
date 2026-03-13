@@ -27,7 +27,7 @@ type MercadoPagoPayment = {
 }
 
 function mapPaymentOrderStatus(status?: string) {
-  if (status === 'approved') return 'approved'
+  if (status === 'approved') return 'paid'
   if (status === 'cancelled') return 'cancelled'
   if (status === 'rejected' || status === 'refunded' || status === 'charged_back') return 'failed'
   return 'pending'
@@ -41,6 +41,21 @@ function mapPaymentStatus(status?: string) {
   return 'pendente'
 }
 
+function paymentMethodLabel(paymentMethodType?: string | null) {
+  if (paymentMethodType === 'bank_transfer') return 'Pix'
+  if (paymentMethodType === 'credit_card') return 'Cartão de crédito'
+  if (paymentMethodType === 'debit_card') return 'Cartão de débito'
+  return 'Pagamento online'
+}
+
+async function throwIfError<T extends { error?: { message?: string } | null }>(promise: Promise<T>) {
+  const result = await promise
+  if (result.error) {
+    throw new Error(result.error.message ?? 'Erro no banco de dados.')
+  }
+  return result
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -50,7 +65,11 @@ serve(async (req) => {
     const url = new URL(req.url)
     const payload = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
 
-    const eventType = url.searchParams.get('type') ?? payload?.type ?? payload?.action ?? 'unknown'
+    const eventType =
+      url.searchParams.get('type') ??
+      payload?.type ??
+      payload?.action ??
+      'unknown'
 
     const incomingPaymentId =
       url.searchParams.get('data.id') ??
@@ -85,13 +104,16 @@ serve(async (req) => {
     const paymentMethodId = paymentData.payment_method_id ?? null
     const status = paymentData.status ?? 'pending'
 
-    const reservationId = paymentData.external_reference ?? paymentData.metadata?.reservation_id ?? null
+    const reservationId =
+      paymentData.external_reference ??
+      paymentData.metadata?.reservation_id ??
+      null
 
     if (!reservationId) {
       return jsonResponse({ received: true, ignored: true, reason: 'reservation_not_found' })
     }
 
-    const { data: paymentOrder } = await adminClient
+    const { data: paymentOrder, error: paymentOrderFetchError } = await adminClient
       .from('payment_orders')
       .select('*')
       .eq('reservation_id', reservationId)
@@ -99,61 +121,75 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle()
 
-    await adminClient.from('payment_events').insert({
-      payment_order_id: paymentOrder?.id ?? null,
-      provider: 'mercado_pago',
-      event_type: eventType,
-      payload_json: paymentData,
-      received_at: new Date().toISOString(),
-      processed_at: new Date().toISOString(),
-      success: true,
-    })
+    if (paymentOrderFetchError) {
+      throw new Error(paymentOrderFetchError.message)
+    }
+
+    await throwIfError(
+      adminClient.from('payment_events').insert({
+        payment_order_id: paymentOrder?.id ?? null,
+        provider: 'mercado_pago',
+        event_type: eventType,
+        payload_json: paymentData,
+        received_at: new Date().toISOString(),
+        processed_at: new Date().toISOString(),
+        success: true,
+      }),
+    )
 
     if (paymentOrder?.id) {
-      await adminClient
-        .from('payment_orders')
-        .update({
-          status: mapPaymentOrderStatus(status),
-          provider_payment_id: paymentId,
-          provider_external_id: paymentOrder.provider_external_id ?? paymentId,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', paymentOrder.id)
+      await throwIfError(
+        adminClient
+          .from('payment_orders')
+          .update({
+            status: mapPaymentOrderStatus(status),
+            provider_payment_id: paymentId,
+            provider_external_id: paymentOrder.provider_external_id ?? paymentId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', paymentOrder.id),
+      )
     } else {
-      await adminClient
-        .from('payment_orders')
+      await throwIfError(
+        adminClient
+          .from('payment_orders')
+          .update({
+            status: mapPaymentOrderStatus(status),
+            provider_payment_id: paymentId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('reservation_id', reservationId)
+          .eq('status', 'pending'),
+      )
+    }
+
+    await throwIfError(
+      adminClient
+        .from('payments')
         .update({
-          status: mapPaymentOrderStatus(status),
-          provider_payment_id: paymentId,
+          status: mapPaymentStatus(status),
+          payment_method_type: paymentMethodType,
+          payment_method_id: paymentMethodId,
+          provider_reference: paymentId,
+          paid_at: status === 'approved' ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         })
         .eq('reservation_id', reservationId)
-        .eq('status', 'pending')
-    }
-
-    await adminClient
-      .from('payments')
-      .update({
-        status: mapPaymentStatus(status),
-        payment_method_type: paymentMethodType,
-        payment_method_id: paymentMethodId,
-        provider_reference: paymentId,
-        paid_at: status === 'approved' ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('reservation_id', reservationId)
-      .eq('status', 'pendente')
+        .eq('status', 'pendente'),
+    )
 
     if (status === 'approved') {
-      await adminClient
-        .from('reservations')
-        .update({
-          status: 'reservado',
-          expires_at: null,
-          entry_due_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', reservationId)
+      await throwIfError(
+        adminClient
+          .from('reservations')
+          .update({
+            status: 'reservado',
+            expires_at: null,
+            entry_due_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', reservationId),
+      )
 
       const { data: reservation, error: reservationError } = await adminClient
         .from('reservations')
@@ -169,6 +205,7 @@ serve(async (req) => {
       }
 
       const html = buildContractHtml(reservation)
+
       const documentHash = await crypto.subtle
         .digest('SHA-256', new TextEncoder().encode(html))
         .then((buffer) =>
@@ -177,36 +214,44 @@ serve(async (req) => {
             .join(''),
         )
 
-      const { data: existingContract } = await adminClient
+      const { data: existingContract, error: contractFetchError } = await adminClient
         .from('contracts')
         .select('*')
         .eq('reservation_id', reservationId)
         .maybeSingle()
 
+      if (contractFetchError) {
+        throw new Error(contractFetchError.message)
+      }
+
       if (existingContract) {
-        await adminClient
-          .from('contracts')
-          .update({
+        await throwIfError(
+          adminClient
+            .from('contracts')
+            .update({
+              status: 'liberado_assinatura',
+              html_content: html,
+              generated_at: new Date().toISOString(),
+              released_at: new Date().toISOString(),
+              document_hash: documentHash,
+              template_key: 'default_v1',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingContract.id),
+        )
+      } else {
+        await throwIfError(
+          adminClient.from('contracts').insert({
+            reservation_id: reservationId,
+            version: 1,
             status: 'liberado_assinatura',
             html_content: html,
             generated_at: new Date().toISOString(),
             released_at: new Date().toISOString(),
             document_hash: documentHash,
             template_key: 'default_v1',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingContract.id)
-      } else {
-        await adminClient.from('contracts').insert({
-          reservation_id: reservationId,
-          version: 1,
-          status: 'liberado_assinatura',
-          html_content: html,
-          generated_at: new Date().toISOString(),
-          released_at: new Date().toISOString(),
-          document_hash: documentHash,
-          template_key: 'default_v1',
-        })
+          }),
+        )
       }
 
       const contractViewLink = await ensureSecureLink({
@@ -227,36 +272,29 @@ serve(async (req) => {
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       })
 
-      const paymentMethodLabel =
-        paymentMethodType === 'bank_transfer'
-          ? 'Pix'
-          : paymentMethodType === 'credit_card'
-            ? 'Cartão de crédito'
-            : paymentMethodType === 'debit_card'
-              ? 'Cartão de débito'
-              : 'Pagamento online'
-
       await queueOrSendWhatsapp({
         reservationId,
         phone: reservation.customer_phone,
         templateName: 'payment_confirmed',
         messageBody:
-          `Pagamento aprovado com sucesso via ${paymentMethodLabel}. ` +
+          `Pagamento aprovado com sucesso via ${paymentMethodLabel(paymentMethodType)}. ` +
           `Sua reserva está confirmada. ` +
           `Status: ${appUrl}/minha-reserva/${statusLink.token} | ` +
           `Contrato: ${appUrl}/contrato/${contractViewLink.token} | ` +
           `Assinatura: ${appUrl}/contrato/${contractSignLink.token}`,
       })
     } else if (['cancelled', 'rejected', 'refunded', 'charged_back'].includes(status)) {
-      await adminClient
-        .from('reservations')
-        .update({
-          status: 'cancelado',
-          expires_at: null,
-          entry_due_at: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', reservationId)
+      await throwIfError(
+        adminClient
+          .from('reservations')
+          .update({
+            status: 'cancelado',
+            expires_at: null,
+            entry_due_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', reservationId),
+      )
 
       const { data: reservation } = await adminClient
         .from('reservations')
@@ -275,7 +313,7 @@ serve(async (req) => {
       }
     }
 
-    return jsonResponse({ received: true })
+    return jsonResponse({ received: true, paymentId, reservationId, status })
   } catch (error) {
     return jsonResponse(
       { error: error instanceof Error ? error.message : 'Erro interno.' },
