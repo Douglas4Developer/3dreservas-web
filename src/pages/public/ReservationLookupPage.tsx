@@ -113,56 +113,78 @@ export default function ReservationLookupPage() {
         <article className="card details-card">
           <h2>Pagamento da entrada</h2>
 
-          {activeOrder ? (
+          {lookup.activePaymentOrder ? (
             <div className="stack-list">
-              <div className="line-card">
-                <div>
-                  <strong>{formatCurrency(activeOrder.amount)}</strong>
-                  <p>Expira em {formatCountdown(activeOrder.expires_at)}</p>
-                  <p>
-                    Tipo de checkout:{' '}
-                    {activeOrder.checkout_type === 'pix' ? 'Pix' : activeOrder.checkout_type === 'card' ? 'Cartão' : 'Pix ou cartão'}
-                  </p>
-                </div>
-                <StatusBadge status={activeOrder.status} />
-              </div>
 
-              {activeOrderIsPix ? (
-                <div className="pix-payment-card">
-                  <h3>Pague com Pix</h3>
-                  {activeOrder.qr_code_base64 ? (
+              {/* PIX */}
+              {lookup.activePaymentOrder.checkout_type === 'pix' &&
+              lookup.activePaymentOrder.status === 'pending' ? (
+                <div className="stack-list">
+
+                  <h3>Pague via Pix</h3>
+
+                  {lookup.activePaymentOrder.qr_code_base64 ? (
                     <img
-                      className="pix-qr-image"
-                      src={`data:image/png;base64,${activeOrder.qr_code_base64}`}
+                      src={`data:image/png;base64,${lookup.activePaymentOrder.qr_code_base64}`}
                       alt="QR Code Pix"
+                      style={{ width: 220, maxWidth: '100%', borderRadius: 12 }}
                     />
                   ) : null}
-                  {activeOrder.pix_copy_paste ? (
+
+                  {lookup.activePaymentOrder.pix_copy_paste ? (
                     <>
-                      <label>
-                        Código copia e cola
-                        <textarea readOnly rows={4} value={activeOrder.pix_copy_paste} />
-                      </label>
-                      <button className="button" type="button" onClick={() => void copyPixCode(activeOrder.pix_copy_paste)}>
-                        {copied ? 'Código copiado!' : 'Copiar código Pix'}
+                      <textarea
+                        readOnly
+                        value={lookup.activePaymentOrder.pix_copy_paste}
+                        rows={4}
+                      />
+
+                      <button
+                        type="button"
+                        className="button"
+                        onClick={() =>
+                          navigator.clipboard.writeText(
+                            lookup.activePaymentOrder!.pix_copy_paste ?? ''
+                          )
+                        }
+                      >
+                        Copiar código Pix
                       </button>
                     </>
-                  ) : (
-                    <p>O código Pix ainda está sendo preparado.</p>
-                  )}
+                  ) : null}
+
                 </div>
-              ) : activeOrder.checkout_url ? (
-                <a className="button" href={activeOrder.checkout_url} target="_blank" rel="noreferrer">
-                  Ir para o pagamento
-                </a>
-              ) : (
-                <p>O link de pagamento ainda está sendo preparado.</p>
-              )}
-            </div>
-          ) : latestPayment ? (
-            <div className="alert alert-success">
-              Entrada já confirmada.<br />
-              Método: {getPaymentMethodLabel(latestPayment)}
+              ) : null}
+
+              {/* CHECKOUT CARTÃO */}
+              {lookup.activePaymentOrder.checkout_type === 'card' ? (
+                <>
+                  <div className="line-card">
+                    <div>
+                      <strong>{formatCurrency(lookup.activePaymentOrder.amount)}</strong>
+                      <p>
+                        Expira em {formatCountdown(lookup.activePaymentOrder.expires_at)}
+                      </p>
+                    </div>
+
+                    <StatusBadge status={lookup.activePaymentOrder.status} />
+                  </div>
+
+                  {lookup.activePaymentOrder.checkout_url ? (
+                    <a
+                      className="button"
+                      href={lookup.activePaymentOrder.checkout_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Ir para o pagamento
+                    </a>
+                  ) : (
+                    <p>O link de pagamento ainda está sendo preparado.</p>
+                  )}
+                </>
+              ) : null}
+
             </div>
           ) : (
             <p>Nenhum checkout pendente para esta reserva.</p>

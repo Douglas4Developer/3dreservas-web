@@ -37,8 +37,8 @@ export default function PublicLayout() {
             <p>Gestão de reservas, pagamentos, contratos, galeria do espaço e agenda do 3Deventos.</p>
           </div>
           <div>
-            <p>Stack recomendada: React + Supabase + Vercel</p>
-            <p>MVP com baixo custo, Edge Functions, webhooks e crescimento gradual.</p>
+            <p>Desenvolvido por DOUGLAS FERREIRA</p>
+            <p>Plataforma exclusiva para gerenciamento de reservas.</p>
           </div>
         </div>
       </footer>
