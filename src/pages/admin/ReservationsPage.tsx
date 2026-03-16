@@ -7,6 +7,8 @@ import { getDefaultSpaceId } from '../../services/leads.service'
 import { createPaymentOrder, createPixPayment, fetchPaymentOrders } from '../../services/payment-orders.service'
 import { confirmManualPayment } from '../../services/payments.service'
 import { createReservation, fetchReservations, updateReservation } from '../../services/reservations.service'
+import { fetchContracts } from '../../services/contracts.service'
+import { fetchSignatures } from '../../services/signatures.service'
 import type { PaymentOrder, Reservation, ReservationStatus } from '../../types/database'
 
 const reservationStatusOptions: ReservationStatus[] = [
@@ -48,19 +50,34 @@ export default function ReservationsPage() {
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null)
   const [pixPreviewOrder, setPixPreviewOrder] = useState<PaymentOrder | null>(null)
   const [copiedPixCode, setCopiedPixCode] = useState(false)
+  const [lockedReservationIds, setLockedReservationIds] = useState<string[]>([])
   const [form, setForm] = useState(initialForm)
 
   async function loadData() {
     setLoading(true)
     try {
-      const [reservationsData, defaultSpaceId, paymentOrdersData] = await Promise.all([
+      const [reservationsData, defaultSpaceId, paymentOrdersData, contractsData] = await Promise.all([
         fetchReservations(),
         getDefaultSpaceId(),
         fetchPaymentOrders(),
+        fetchContracts(),
       ])
+
+      const signatureEntries = await Promise.all(
+        contractsData.map(async (contract) => [contract.id, await fetchSignatures(contract.id)] as const),
+      )
+      const signaturesByContractId = Object.fromEntries(signatureEntries)
+      const lockedIds = contractsData
+        .filter((contract) => {
+          const signatures = signaturesByContractId[contract.id] ?? []
+          return Boolean(contract.signed_at) || signatures.length > 0
+        })
+        .map((contract) => contract.reservation_id)
+
       setReservations(reservationsData)
       setPaymentOrders(paymentOrdersData)
       setSpaceId(defaultSpaceId)
+      setLockedReservationIds(lockedIds)
       setError(null)
     } catch (serviceError) {
       setError(serviceError instanceof Error ? serviceError.message : 'Erro ao carregar reservas.')
@@ -83,6 +100,8 @@ export default function ReservationsPage() {
     setForm(initialForm)
     setEditingReservation(null)
   }
+
+  const isDateLocked = editingReservation ? lockedReservationIds.includes(editingReservation.id) : false
 
   function fillFormFromReservation(reservation: Reservation) {
     setEditingReservation(reservation)
@@ -290,7 +309,7 @@ const paymentOrdersMap = useMemo(() => {
               </label>
               <label>
                 Data do evento
-                <input type="date" value={form.event_date} onChange={(event) => updateField('event_date', event.target.value)} required />
+                <input type="date" value={form.event_date} onChange={(event) => updateField('event_date', event.target.value)} required disabled={isDateLocked} />
               </label>
               <label>
                 Status inicial
@@ -307,11 +326,11 @@ const paymentOrdersMap = useMemo(() => {
             <div className="inline-form-grid inline-form-grid--three">
               <label>
                 Início
-                <input type="time" value={form.period_start} onChange={(event) => updateField('period_start', event.target.value)} />
+                <input type="time" value={form.period_start} onChange={(event) => updateField('period_start', event.target.value)} disabled={isDateLocked} />
               </label>
               <label>
                 Término
-                <input type="time" value={form.period_end} onChange={(event) => updateField('period_end', event.target.value)} />
+                <input type="time" value={form.period_end} onChange={(event) => updateField('period_end', event.target.value)} disabled={isDateLocked} />
               </label>
               <label>
                 Taxa de limpeza
@@ -422,6 +441,7 @@ const paymentOrdersMap = useMemo(() => {
                     <td>
                       <strong>{formatDate(reservation.event_date)}</strong>
                       <div className="table-helper">{reservation.event_type ?? 'Evento privado'}</div>
+                      {lockedReservationIds.includes(reservation.id) ? <div className="table-helper">Data travada por assinatura</div> : null}
                     </td>
                     <td>
                       <div className="stack-list compact-stack">

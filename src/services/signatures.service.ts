@@ -32,19 +32,28 @@ export async function registerPublicSignature(input: CreateSignatureInput) {
         signed_at: new Date().toISOString(),
         ip_address: '127.0.0.1',
         user_agent: 'Demo Browser',
-        evidence_json: { method: 'typed_name' },
+        evidence_json: {
+          method: input.signature_data_url ? 'drawn_signature' : 'typed_name',
+          signature_data_url: input.signature_data_url ?? null,
+        },
         document_hash: lookup.contract.document_hash ?? null,
         created_at: new Date().toISOString(),
       } satisfies Signature,
+      pdfUrl: lookup.contract.final_file_path ?? lookup.contract.file_path ?? null,
     }
   }
 
-  return invokeEdgeFunction<{ signature: Signature }>('register-signature', {
+  return invokeEdgeFunction<{ signature: Signature; pdfUrl?: string | null }>('register-signature', {
     body: input,
   })
 }
 
-export async function registerAdminSignature(input: { contractId: string; signer_name: string; signer_document?: string }) {
+export async function registerAdminSignature(input: {
+  contractId: string
+  signer_name: string
+  signer_document?: string
+  signature_data_url?: string
+}) {
   if (!isSupabaseConfigured || !supabase) {
     return {
       signature: {
@@ -56,19 +65,24 @@ export async function registerAdminSignature(input: { contractId: string; signer
         signed_at: new Date().toISOString(),
         ip_address: '127.0.0.1',
         user_agent: 'Demo Browser',
-        evidence_json: { method: 'typed_name' },
+        evidence_json: {
+          method: input.signature_data_url ? 'drawn_signature' : 'typed_name',
+          signature_data_url: input.signature_data_url ?? null,
+        },
         document_hash: null,
         created_at: new Date().toISOString(),
       } satisfies Signature,
+      pdfUrl: null,
     }
   }
 
-  return invokeEdgeFunction<{ signature: Signature }>('register-signature', {
+  return invokeEdgeFunction<{ signature: Signature; pdfUrl?: string | null }>('register-signature', {
     body: {
       contractId: input.contractId,
       signer_role: 'admin',
       signer_name: input.signer_name,
       signer_document: input.signer_document,
+      signature_data_url: input.signature_data_url,
     },
   })
 }
