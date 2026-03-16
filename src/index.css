@@ -987,3 +987,47 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+.contract-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.signature-card {
+  display: grid;
+  gap: 0.875rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.signature-canvas {
+  width: 100%;
+  min-height: 220px;
+  border-radius: 0.875rem;
+  border: 1px dashed rgba(100, 116, 139, 0.65);
+  background: #fff;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.audit-card,
+.signature-preview-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.signature-preview-image {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 0.8rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: #fff;
+}

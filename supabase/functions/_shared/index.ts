@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0'
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'https://esm.sh/pdf-lib@1.17.1'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +15,48 @@ export const whatsappToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN') || ''
 export const whatsappPhoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID') || ''
 
 export const adminClient = createClient(supabaseUrl, serviceRoleKey)
+
+interface ContractPdfReservation {
+  customer_name: string
+  customer_email?: string | null
+  customer_phone: string
+  customer_document?: string | null
+  customer_address?: string | null
+  event_type?: string | null
+  event_date: string
+  period_start?: string | null
+  period_end?: string | null
+  total_amount?: number | null
+  entry_amount?: number | null
+  remaining_amount?: number | null
+  cleaning_fee?: number | null
+  image_use_authorized?: boolean | null
+  venue_address_snapshot?: string | null
+  capacity_snapshot?: number | null
+  notes?: string | null
+}
+
+interface ContractPdfContract {
+  id: string
+  version?: number | null
+  html_content?: string | null
+  lessor_name?: string | null
+  lessor_document?: string | null
+  lessor_address?: string | null
+  forum_city?: string | null
+  document_hash?: string | null
+  status?: string | null
+}
+
+interface ContractPdfSignature {
+  signer_role: 'client' | 'admin'
+  signer_name: string
+  signer_document?: string | null
+  signed_at: string
+  ip_address?: string | null
+  user_agent?: string | null
+  evidence_json?: Record<string, unknown> | null
+}
 
 export function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -55,25 +98,30 @@ function formatCurrency(value?: number | null) {
   return Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-export function buildContractHtml(reservation: {
-  customer_name: string
-  customer_email?: string | null
-  customer_phone: string
-  customer_document?: string | null
-  customer_address?: string | null
-  event_type?: string | null
-  event_date: string
-  period_start?: string | null
-  period_end?: string | null
-  total_amount?: number | null
-  entry_amount?: number | null
-  remaining_amount?: number | null
-  cleaning_fee?: number | null
-  image_use_authorized?: boolean | null
-  venue_address_snapshot?: string | null
-  capacity_snapshot?: number | null
-  notes?: string | null
-}) {
+function formatDateTime(value?: string | null) {
+  if (!value) return 'Não informado'
+  return new Date(value).toLocaleString('pt-BR')
+}
+
+function stripHtml(html?: string | null) {
+  if (!html) return ''
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/h[1-6]>/gi, '\n')
+    .replace(/<li>/gi, '• ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
+export function buildContractHtml(reservation: ContractPdfReservation) {
   const totalAmount = Number(reservation.total_amount ?? 0)
   const entryAmount = Number(reservation.entry_amount ?? 0)
   const remainingAmount = Number(reservation.remaining_amount ?? totalAmount - entryAmount)
@@ -141,6 +189,279 @@ export function buildContractHtml(reservation: {
     <p style="margin-top: 40px; color: #6b7280;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
   </article>
   `.trim()
+}
+
+function buildContractSections(reservation: ContractPdfReservation, contract: ContractPdfContract) {
+  const totalAmount = Number(reservation.total_amount ?? 0)
+  const entryAmount = Number(reservation.entry_amount ?? 0)
+  const remainingAmount = Number(reservation.remaining_amount ?? totalAmount - entryAmount)
+  const cleaningFee = Number(reservation.cleaning_fee ?? 100)
+  const lessorName = contract.lessor_name ?? 'Douglas Soares de Souza Ferreira'
+  const lessorDocument = contract.lessor_document ?? '708.321.121-35'
+  const lessorAddress = contract.lessor_address ?? 'Estrada 114 QD3 LT 13, Chácara São Joaquim, Goiânia - GO'
+  const forumCity = contract.forum_city ?? 'Goiânia - GO'
+
+  const renderedHtml = stripHtml(contract.html_content)
+
+  const sections = [
+    {
+      title: 'Partes',
+      body: [
+        `LOCADOR: ${lessorName}, CPF/CNPJ ${lessorDocument}, endereço ${lessorAddress}.`,
+        `LOCATÁRIO: ${reservation.customer_name}, documento ${reservation.customer_document ?? 'não informado'}, endereço ${reservation.customer_address ?? 'não informado'}, telefone ${reservation.customer_phone}, e-mail ${reservation.customer_email ?? 'não informado'}.`,
+      ].join(' '),
+    },
+    {
+      title: 'Objeto e período',
+      body: [
+        `Locação do espaço 3Deventos em ${reservation.venue_address_snapshot ?? 'Jardim Bonanza, Goiânia - GO'} para ${reservation.event_type ?? 'evento privado'}.`,
+        `Data do evento: ${reservation.event_date}. Horário: ${reservation.period_start ?? '09:00'} até ${reservation.period_end ?? '23:00'}.`,
+      ].join(' '),
+    },
+    {
+      title: 'Valores',
+      body: [
+        `Valor total: ${formatCurrency(totalAmount)}.`,
+        `Entrada: ${formatCurrency(entryAmount)}.`,
+        `Saldo restante: ${formatCurrency(remainingAmount)}.`,
+        `Taxa de limpeza: ${formatCurrency(cleaningFee)} quando aplicável.`,
+      ].join(' '),
+    },
+    {
+      title: 'Regras principais',
+      body: [
+        `Capacidade máxima: ${reservation.capacity_snapshot ?? 100} pessoas.`,
+        'É proibido som automotivo.',
+        'O locatário deve respeitar limites de horário e volume de som.',
+        'Danos ao imóvel ou mobiliário são de responsabilidade do locatário.',
+      ].join(' '),
+    },
+    {
+      title: 'Disposições gerais',
+      body: [
+        reservation.image_use_authorized === false
+          ? 'O locatário não autoriza o uso de imagens do evento para divulgação.'
+          : 'O locatário autoriza o uso de imagens do evento para divulgação, salvo oposição por escrito.',
+        `Foro eleito: ${forumCity}.`,
+        `Observações: ${reservation.notes ?? 'Sem observações adicionais.'}`,
+      ].join(' '),
+    },
+  ]
+
+  if (renderedHtml) {
+    sections.push({
+      title: 'Texto integral do contrato',
+      body: renderedHtml,
+    })
+  }
+
+  return sections
+}
+
+function splitText(font: PDFFont, text: string, size: number, maxWidth: number) {
+  const words = text.replace(/\s+/g, ' ').trim().split(' ')
+  const lines: string[] = []
+  let current = ''
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word
+    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
+      current = next
+      continue
+    }
+
+    if (current) lines.push(current)
+    current = word
+  }
+
+  if (current) lines.push(current)
+  return lines
+}
+
+function drawWrappedParagraph(page: PDFPage, font: PDFFont, text: string, size: number, x: number, y: number, maxWidth: number, lineHeight: number) {
+  const lines = splitText(font, text, size, maxWidth)
+  for (const line of lines) {
+    page.drawText(line, {
+      x,
+      y,
+      size,
+      font,
+      color: rgb(0.15, 0.23, 0.35),
+    })
+    y -= lineHeight
+  }
+  return y
+}
+
+function resolveSignatureDataUrl(signature: ContractPdfSignature) {
+  const value = signature.evidence_json?.signature_data_url
+  return typeof value === 'string' && value.startsWith('data:image') ? value : null
+}
+
+function normalizeBase64(dataUrl: string) {
+  return dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+}
+
+export async function generateContractPdfBytes(params: {
+  contract: ContractPdfContract
+  reservation: ContractPdfReservation
+  signatures: ContractPdfSignature[]
+}) {
+  const pdf = await PDFDocument.create()
+  const fontRegular = await pdf.embedFont(StandardFonts.Helvetica)
+  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold)
+  const pageSize: [number, number] = [595.28, 841.89]
+  const margin = 42
+  const usableWidth = pageSize[0] - margin * 2
+
+  let page = pdf.addPage(pageSize)
+  let y = pageSize[1] - margin
+
+  const ensureSpace = (needed = 80) => {
+    if (y > margin + needed) return
+    page = pdf.addPage(pageSize)
+    y = pageSize[1] - margin
+  }
+
+  page.drawText('CONTRATO DE LOCAÇÃO DE ESPAÇO - 3DEventos', {
+    x: margin,
+    y,
+    size: 16,
+    font: fontBold,
+    color: rgb(0.08, 0.12, 0.2),
+  })
+  y -= 26
+
+  const metaLine = `Contrato #${params.contract.id.slice(0, 8)} • versão ${params.contract.version ?? 1} • status ${params.contract.status ?? 'liberado_assinatura'}`
+  page.drawText(metaLine, {
+    x: margin,
+    y,
+    size: 9,
+    font: fontRegular,
+    color: rgb(0.4, 0.45, 0.52),
+  })
+  y -= 20
+
+  for (const section of buildContractSections(params.reservation, params.contract)) {
+    ensureSpace(100)
+    page.drawText(section.title, {
+      x: margin,
+      y,
+      size: 12,
+      font: fontBold,
+      color: rgb(0.11, 0.18, 0.31),
+    })
+    y -= 18
+    y = drawWrappedParagraph(page, fontRegular, section.body, 10, margin, y, usableWidth, 14)
+    y -= 12
+  }
+
+  ensureSpace(200)
+  page.drawText('Assinaturas e evidências', {
+    x: margin,
+    y,
+    size: 12,
+    font: fontBold,
+    color: rgb(0.11, 0.18, 0.31),
+  })
+  y -= 22
+
+  for (const signature of params.signatures) {
+    ensureSpace(170)
+    page.drawText(signature.signer_role === 'client' ? 'Locatário' : 'Administrador', {
+      x: margin,
+      y,
+      size: 11,
+      font: fontBold,
+      color: rgb(0.1, 0.15, 0.25),
+    })
+    y -= 16
+
+    page.drawText(`${signature.signer_name}${signature.signer_document ? ` • ${signature.signer_document}` : ''}`, {
+      x: margin,
+      y,
+      size: 10,
+      font: fontRegular,
+      color: rgb(0.15, 0.23, 0.35),
+    })
+    y -= 14
+
+    const audit = [
+      `Data/hora: ${formatDateTime(signature.signed_at)}`,
+      `IP: ${signature.ip_address ?? 'não identificado'}`,
+      `Navegador: ${signature.user_agent ?? 'não identificado'}`,
+      `Hash do documento: ${params.contract.document_hash ?? 'não informado'}`,
+    ]
+
+    for (const line of audit) {
+      y = drawWrappedParagraph(page, fontRegular, line, 9, margin, y, usableWidth, 12)
+    }
+
+    const signatureDataUrl = resolveSignatureDataUrl(signature)
+    if (signatureDataUrl) {
+      try {
+        const bytes = Uint8Array.from(atob(normalizeBase64(signatureDataUrl)), (char) => char.charCodeAt(0))
+        const image = await pdf.embedPng(bytes)
+        const scaled = image.scale(0.35)
+        y -= 10
+        page.drawRectangle({
+          x: margin,
+          y: y - scaled.height - 12,
+          width: Math.min(scaled.width + 16, usableWidth),
+          height: scaled.height + 12,
+          color: rgb(1, 1, 1),
+          borderColor: rgb(0.82, 0.85, 0.9),
+          borderWidth: 1,
+        })
+        page.drawImage(image, {
+          x: margin + 8,
+          y: y - scaled.height - 6,
+          width: scaled.width,
+          height: scaled.height,
+        })
+        y -= scaled.height + 24
+      } catch {
+        y -= 10
+      }
+    } else {
+      y -= 12
+    }
+  }
+
+  ensureSpace(80)
+  page.drawText(`PDF atualizado em ${formatDateTime(new Date().toISOString())}`, {
+    x: margin,
+    y,
+    size: 9,
+    font: fontRegular,
+    color: rgb(0.42, 0.48, 0.58),
+  })
+  y -= 12
+  page.drawText('Este arquivo contém selo de IP/data e evidencia o travamento da agenda após a assinatura.', {
+    x: margin,
+    y,
+    size: 9,
+    font: fontRegular,
+    color: rgb(0.42, 0.48, 0.58),
+  })
+
+  return await pdf.save()
+}
+
+export async function uploadContractPdf(contractId: string, version: number | null | undefined, pdfBytes: Uint8Array) {
+  const filePath = `${contractId}/contrato-v${version ?? 1}.pdf`
+  const { error } = await adminClient.storage.from('contracts').upload(filePath, pdfBytes, {
+    contentType: 'application/pdf',
+    upsert: true,
+  })
+
+  if (error) throw error
+
+  const { data } = adminClient.storage.from('contracts').getPublicUrl(filePath)
+  return {
+    filePath,
+    publicUrl: data.publicUrl,
+  }
 }
 
 export async function ensureSecureLink(params: {

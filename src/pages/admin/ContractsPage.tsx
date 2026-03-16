@@ -177,8 +177,8 @@ export default function ContractsPage() {
                           </button>
                         ) : null}
 
-                        {contract?.file_path ? (
-                          <a className="button button-secondary" href={contract.file_path} target="_blank" rel="noreferrer">
+                        {(contract?.final_file_path ?? contract?.file_path) ? (
+                          <a className="button button-secondary" href={contract.final_file_path ?? contract.file_path ?? '#'} target="_blank" rel="noreferrer">
                             Abrir arquivo
                           </a>
                         ) : contract?.html_content ? (

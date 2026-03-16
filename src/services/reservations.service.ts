@@ -37,6 +37,36 @@ function mapReservationPayload(input: Partial<CreateReservationInput>) {
   }
 }
 
+async function assertReservationScheduleUnlocked(input: UpdateReservationInput) {
+  if (!supabase) return
+
+  const scheduleChanged = 'event_date' in input || 'period_start' in input || 'period_end' in input
+  if (!scheduleChanged) return
+
+  const { data: contract, error: contractError } = await supabase
+    .from('contracts')
+    .select('id, status, signed_at')
+    .eq('reservation_id', input.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (contractError) throw contractError
+  if (!contract) return
+
+  const { count, error: signaturesError } = await supabase
+    .from('signatures')
+    .select('*', { count: 'exact', head: true })
+    .eq('contract_id', contract.id)
+
+  if (signaturesError) throw signaturesError
+
+  const isLocked = Boolean(contract.signed_at) || (count ?? 0) > 0
+  if (isLocked) {
+    throw new Error('A data e os horários desta reserva estão bloqueados porque o contrato já possui assinatura registrada.')
+  }
+}
+
 export async function createReservation(input: CreateReservationInput): Promise<Reservation> {
   if (!isSupabaseConfigured || !supabase) {
     return {
@@ -86,6 +116,7 @@ export async function updateReservation(input: UpdateReservationInput): Promise<
     }
   }
 
+  await assertReservationScheduleUnlocked(input)
   const payload = mapReservationPayload(input)
   const { data, error } = await supabase.from('reservations').update(payload).eq('id', input.id).select('*').single()
   if (error) throw error

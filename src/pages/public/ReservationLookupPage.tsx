@@ -218,8 +218,8 @@ export default function ReservationLookupPage() {
                 </div>
                 <StatusBadge status={lookup.contract.status} />
               </div>
-              {lookup.contract.file_path ? (
-                <a className="button button-secondary" href={lookup.contract.file_path} target="_blank" rel="noreferrer">
+              {(lookup.contract.final_file_path ?? lookup.contract.file_path) ? (
+                <a className="button button-secondary" href={lookup.contract.final_file_path ?? lookup.contract.file_path ?? '#'} target="_blank" rel="noreferrer">
                   Abrir contrato
                 </a>
               ) : lookup.contract.html_content ? (
