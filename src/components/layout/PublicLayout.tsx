@@ -14,13 +14,7 @@ const navigation = [
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const whatsappUrl = useMemo(() => {
-    return import.meta.env.VITE_PUBLIC_WHATSAPP_URL || '/disponibilidade'
-  }, [])
-
-  const whatsappProps = whatsappUrl.startsWith('http')
-    ? { href: whatsappUrl, target: '_blank', rel: 'noreferrer' as const }
-    : { href: whatsappUrl }
+  const whatsappUrl = 'https://api.whatsapp.com/send/?phone=556284876724&text&type=phone_number&app_absent=0'
 
   return (
     <div className="public-shell">
@@ -100,7 +94,7 @@ export default function PublicLayout() {
         <Link className="button" to="/disponibilidade">
           Consultar disponibilidade
         </Link>
-        <a className="button button-secondary" {...whatsappProps}>
+        <a className="button button-secondary" href={whatsappUrl} target="_blank" rel="noreferrer">
           Falar no WhatsApp
         </a>
       </div>
