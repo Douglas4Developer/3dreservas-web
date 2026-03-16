@@ -1,0 +1,27 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="1200" rx="48" fill="#EAF2FF"/>
+  <rect x="70" y="70" width="1460" height="1060" rx="40" fill="url(#paint0_linear)"/>
+  <circle cx="1310" cy="220" r="160" fill="#D4A63C" fill-opacity="0.18"/>
+  <circle cx="300" cy="250" r="220" fill="#1F5FBF" fill-opacity="0.12"/>
+  <circle cx="1240" cy="900" r="220" fill="#1F5FBF" fill-opacity="0.1"/>
+  <rect x="160" y="190" width="1280" height="720" rx="32" fill="white" fill-opacity="0.88"/>
+  <rect x="210" y="240" width="470" height="520" rx="26" fill="#E9F1FF"/>
+  <rect x="730" y="240" width="500" height="58" rx="14" fill="#EDF4FF"/>
+  <rect x="730" y="340" width="390" height="58" rx="14" fill="#EDF4FF"/>
+  <rect x="730" y="455" width="550" height="26" rx="13" fill="#E3ECFA"/>
+  <rect x="730" y="505" width="520" height="26" rx="13" fill="#E3ECFA"/>
+  <rect x="730" y="555" width="430" height="26" rx="13" fill="#E3ECFA"/>
+  <rect x="730" y="650" width="240" height="66" rx="20" fill="#1F5FBF"/>
+  <rect x="1000" y="650" width="250" height="66" rx="20" fill="#F5F8FF" stroke="#C9D7F1" stroke-width="4"/>
+  <text x="730" y="150" fill="#1F5FBF" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">Substitua pela melhor foto da sua capa</text>
+  <text x="270" y="520" fill="#102B5F" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="700">3DEventos</text>
+  <text x="248" y="585" fill="#5F6F8F" font-family="Arial, Helvetica, sans-serif" font-size="26">Use aqui uma foto real do seu espaço</text>
+  <text x="805" y="693" fill="white" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Ver datas</text>
+  <text x="1065" y="693" fill="#123B7A" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Ver galeria</text>
+  <defs>
+    <linearGradient id="paint0_linear" x1="120" y1="90" x2="1490" y2="1110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F9FBFF"/>
+      <stop offset="1" stop-color="#DDE9FA"/>
+    </linearGradient>
+  </defs>
+</svg>
