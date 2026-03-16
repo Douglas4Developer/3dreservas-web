@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatDate, formatDateTime } from '../../lib/format'
@@ -8,14 +8,10 @@ import { fetchReservations } from '../../services/reservations.service'
 import { fetchSignatures, registerAdminSignature } from '../../services/signatures.service'
 import type { Contract, Reservation, Signature } from '../../types/database'
 
-interface ContractRow {
-  reservation: Reservation
-  contract: Contract | null
-  signatures: Signature[]
-}
-
 export default function ContractsPage() {
-  const [rows, setRows] = useState<ContractRow[]>([])
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [reservations, setReservations] = useState<Reservation[]>([])
+  const [signaturesMap, setSignaturesMap] = useState<Record<string, Signature[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -26,28 +22,13 @@ export default function ContractsPage() {
     setLoading(true)
     try {
       const [contractData, reservationData] = await Promise.all([fetchContracts(), fetchReservations()])
+      setContracts(contractData)
+      setReservations(reservationData)
 
-      const contractMap = contractData.reduce<Record<string, Contract>>((accumulator, contract) => {
-        accumulator[contract.reservation_id] = contract
-        return accumulator
-      }, {})
-
-      const eligibleReservations = reservationData.filter((reservation) => ['reservado', 'aguardando_pagamento'].includes(reservation.status))
       const signaturesEntries = await Promise.all(
         contractData.map(async (contract) => [contract.id, await fetchSignatures(contract.id)] as const),
       )
-      const signaturesMap = Object.fromEntries(signaturesEntries)
-
-      setRows(
-        eligibleReservations.map((reservation) => {
-          const contract = contractMap[reservation.id] ?? null
-          return {
-            reservation,
-            contract,
-            signatures: contract ? signaturesMap[contract.id] ?? [] : [],
-          }
-        }),
-      )
+      setSignaturesMap(Object.fromEntries(signaturesEntries))
       setError(null)
     } catch (serviceError) {
       setError(serviceError instanceof Error ? serviceError.message : 'Erro ao carregar contratos.')
@@ -60,7 +41,14 @@ export default function ContractsPage() {
     void loadData()
   }, [])
 
-  useEffect(() => subscribeToTables(['contracts', 'signatures', 'reservations'], () => void loadData()), [])
+  useEffect(() => subscribeToTables(['contracts', 'signatures'], () => void loadData()), [])
+
+  const reservationMap = useMemo(() => {
+    return reservations.reduce<Record<string, Reservation>>((accumulator, reservation) => {
+      accumulator[reservation.id] = reservation
+      return accumulator
+    }, {})
+  }, [reservations])
 
   async function handleGenerateContract(reservationId: string) {
     setGeneratingFor(reservationId)
@@ -107,43 +95,36 @@ export default function ContractsPage() {
       <div className="card table-card">
         {loading ? (
           <p>Carregando contratos...</p>
-        ) : rows.length === 0 ? (
-          <p>Nenhuma reserva apta para contrato ainda.</p>
+        ) : contracts.length === 0 ? (
+          <p>Nenhum contrato gerado.</p>
         ) : (
           <table>
             <thead>
               <tr>
                 <th>Evento</th>
                 <th>Cliente</th>
-                <th>Reserva</th>
-                <th>Contrato</th>
+                <th>Versão</th>
+                <th>Status</th>
                 <th>Assinaturas</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ reservation, contract, signatures }) => {
+              {contracts.map((contract) => {
+                const reservation = reservationMap[contract.reservation_id]
+                const signatures = signaturesMap[contract.id] ?? []
                 const hasClientSignature = signatures.some((item) => item.signer_role === 'client')
                 const hasAdminSignature = signatures.some((item) => item.signer_role === 'admin')
                 return (
-                  <tr key={reservation.id}>
-                    <td>{formatDate(reservation.event_date)}</td>
-                    <td>{reservation.customer_name}</td>
-                    <td>
-                      <StatusBadge status={reservation.status} />
+                  <tr key={contract.id}>
+                    <td data-label="Evento">{reservation ? formatDate(reservation.event_date) : '-'}</td>
+                    <td data-label="Cliente">{reservation?.customer_name ?? '-'}</td>
+                    <td data-label="Versão">{contract.version}</td>
+                    <td data-label="Status">
+                      <StatusBadge status={contract.status} />
                     </td>
-                    <td>
-                      {contract ? (
-                        <div className="stack-list">
-                          <span>Versão {contract.version}</span>
-                          <StatusBadge status={contract.status} />
-                        </div>
-                      ) : (
-                        <span className="table-helper">Ainda não gerado</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="stack-list">
+                    <td data-label="Assinaturas">
+                      <div className="stack-list compact-stack">
                         {signatures.length === 0 ? (
                           <span className="table-helper">Sem assinaturas ainda</span>
                         ) : (
@@ -155,18 +136,17 @@ export default function ContractsPage() {
                         )}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Ações">
                       <div className="table-actions">
                         <button
                           className="button button-secondary"
                           type="button"
-                          onClick={() => void handleGenerateContract(reservation.id)}
-                          disabled={generatingFor === reservation.id}
+                          onClick={() => void handleGenerateContract(contract.reservation_id)}
+                          disabled={generatingFor === contract.reservation_id}
                         >
-                          {generatingFor === reservation.id ? 'Gerando...' : contract ? 'Regenerar' : 'Gerar contrato'}
+                          {generatingFor === contract.reservation_id ? 'Gerando...' : 'Regenerar'}
                         </button>
-
-                        {contract && hasClientSignature && !hasAdminSignature ? (
+                        {hasClientSignature && !hasAdminSignature ? (
                           <button
                             className="button button-secondary"
                             type="button"
@@ -176,14 +156,13 @@ export default function ContractsPage() {
                             {signingFor === contract.id ? 'Assinando...' : 'Assinar admin'}
                           </button>
                         ) : null}
-
-                        {(contract?.final_file_path ?? contract?.file_path) ? (
-                          <a className="button button-secondary" href={contract.final_file_path ?? contract.file_path ?? '#'} target="_blank" rel="noreferrer">
-                            Abrir arquivo
+                        {contract.file_path ? (
+                          <a className="button button-secondary" href={contract.file_path} target="_blank" rel="noreferrer">
+                            Abrir contrato
                           </a>
-                        ) : contract?.html_content ? (
-                          <span className="table-helper">Prévia HTML pronta</span>
-                        ) : null}
+                        ) : (
+                          <span className="table-helper">Sem arquivo</span>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AdminCalendar } from '../../components/calendar/AdminCalendar'
+import { useEffect, useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatCard } from '../../components/ui/StatCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -18,7 +17,6 @@ export default function DashboardPage() {
   const [pendingPayments, setPendingPayments] = useState<Payment[]>([])
   const [pendingPaymentOrders, setPendingPaymentOrders] = useState<PaymentOrder[]>([])
   const [recentMessagesCount, setRecentMessagesCount] = useState(0)
-  const [referenceDate, setReferenceDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,9 +31,9 @@ export default function DashboardPage() {
         fetchWhatsappMessages(),
       ])
       setSummary(nextSummary)
-      setReservations(nextReservations)
+      setReservations(nextReservations.slice(0, 5))
       setPendingPayments(nextPendingPayments)
-      setPendingPaymentOrders(nextPaymentOrders.slice(0, 6))
+      setPendingPaymentOrders(nextPaymentOrders.slice(0, 5))
       setRecentMessagesCount(nextMessages.length)
       setError(null)
     } catch (serviceError) {
@@ -54,128 +52,85 @@ export default function DashboardPage() {
     [],
   )
 
-  const upcomingReservations = useMemo(
-    () => [...reservations].sort((a, b) => a.event_date.localeCompare(b.event_date)).slice(0, 6),
-    [reservations],
-  )
-
   return (
     <div className="stack-lg">
-      <PageHeader
-        title="Dashboard estilo Airbnb"
-        description="Ocupação do mês, receita prevista, pagamentos ativos, reservas futuras e comunicação recente em uma visão única."
-      />
+      <PageHeader title="Dashboard operacional" description="Visão rápida da agenda, pagamentos, contratos, mídia e comunicação." />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
       {loading || !summary ? (
         <div className="card">Carregando indicadores...</div>
       ) : (
-        <>
-          <div className="card-grid card-grid--six">
-            <StatCard label="Ocupação" value={`${summary.occupancyRate}%`} hint={`${summary.bookedDays} dias ocupados / ${summary.availableDays} livres`} />
-            <StatCard label="Receita prevista" value={formatCurrency(summary.projectedRevenue)} hint="Total das reservas lançadas" />
-            <StatCard label="Entrada confirmada" value={formatCurrency(summary.confirmedRevenue)} hint="Pagamentos aprovados ou confirmados" />
-            <StatCard label="Ticket médio" value={formatCurrency(summary.averageTicket)} hint="Média por reserva" />
-            <StatCard label="Leads" value={summary.totalLeads} hint={`WhatsApp recente: ${recentMessagesCount}`} />
-            <StatCard label="Contratos pendentes" value={summary.pendingContracts} hint={`${summary.pendingPayments} pagamentos aguardando ação`} />
-          </div>
-
-          <div className="dashboard-airbnb-grid">
-            <article className="card stack-lg">
-              <div className="calendar-card__header">
-                <div>
-                  <h3>Mapa de ocupação</h3>
-                  <p>Leitura visual da agenda com todos os status internos do administrativo.</p>
-                </div>
-                <div className="month-navigation">
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    onClick={() => setReferenceDate(new Date(referenceDate.getFullYear(), referenceDate.getMonth() - 1, 1))}
-                  >
-                    Mês anterior
-                  </button>
-                  <button
-                    type="button"
-                    className="button button-secondary"
-                    onClick={() => setReferenceDate(new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1))}
-                  >
-                    Próximo mês
-                  </button>
-                </div>
-              </div>
-              <AdminCalendar referenceDate={referenceDate} reservations={reservations} />
-            </article>
-
-            <div className="stack-lg">
-              <article className="card">
-                <h3>Próximas reservas</h3>
-                <div className="stack-list">
-                  {upcomingReservations.length === 0 ? (
-                    <p>Nenhuma reserva cadastrada.</p>
-                  ) : (
-                    upcomingReservations.map((reservation) => (
-                      <div className="line-card" key={reservation.id}>
-                        <div>
-                          <strong>{reservation.customer_name}</strong>
-                          <p>
-                            {formatDate(reservation.event_date)} • {reservation.event_type ?? 'Evento privado'}
-                          </p>
-                        </div>
-                        <div className="stack-list compact-stack right-align-stack">
-                          <StatusBadge status={reservation.status} />
-                          <span className="table-helper">{formatCurrency(reservation.total_amount)}</span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </article>
-
-              <article className="card">
-                <h3>Pagamentos online ativos</h3>
-                <div className="stack-list">
-                  {pendingPaymentOrders.length === 0 ? (
-                    <p>Nenhum checkout ou Pix pendente no momento.</p>
-                  ) : (
-                    pendingPaymentOrders.map((order) => (
-                      <div className="line-card" key={order.id}>
-                        <div>
-                          <strong>{formatCurrency(order.amount)}</strong>
-                          <p>
-                            {order.checkout_type === 'pix' ? 'Pix dedicado' : order.checkout_type === 'card' ? 'Cartão' : 'Pix ou cartão'}
-                          </p>
-                        </div>
-                        <StatusBadge status={order.status} />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </article>
-
-              <article className="card">
-                <h3>Aguardando ação interna</h3>
-                <div className="stack-list">
-                  {pendingPayments.length === 0 ? (
-                    <p>Nenhum pagamento pendente no momento.</p>
-                  ) : (
-                    pendingPayments.map((payment) => (
-                      <div className="line-card" key={payment.id}>
-                        <div>
-                          <strong>{formatCurrency(payment.amount)}</strong>
-                          <p>{payment.provider_reference ?? payment.provider ?? 'Sem referência'}</p>
-                        </div>
-                        <StatusBadge status={payment.status} />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </article>
-            </div>
-          </div>
-        </>
+        <div className="card-grid card-grid--six">
+          <StatCard label="Interesses" value={summary.totalLeads} hint="Leads recebidos" />
+          <StatCard label="Reservas" value={summary.totalReservations} hint="Todas as reservas" />
+          <StatCard label="Confirmadas" value={summary.confirmedReservations} hint="Status reservado" />
+          <StatCard label="Checkouts pendentes" value={summary.activePaymentOrders} hint="Links ativos no momento" />
+          <StatCard label="Mídias ativas" value={summary.mediaItems} hint="Fotos e vídeos publicados" />
+          <StatCard label="Ocupação" value={`${summary.occupancyRate}%`} hint={`WhatsApp recente: ${recentMessagesCount}`} />
+        </div>
       )}
+
+      <div className="dashboard-grid">
+        <article className="card">
+          <h3>Próximas reservas</h3>
+          <div className="stack-list">
+            {reservations.length === 0 ? (
+              <p>Nenhuma reserva cadastrada.</p>
+            ) : (
+              reservations.map((reservation) => (
+                <div className="line-card" key={reservation.id}>
+                  <div>
+                    <strong>{reservation.customer_name}</strong>
+                    <p>
+                      {formatDate(reservation.event_date)} • {formatCurrency(reservation.total_amount)}
+                    </p>
+                  </div>
+                  <StatusBadge status={reservation.status} />
+                </div>
+              ))
+            )}
+          </div>
+        </article>
+
+        <article className="card">
+          <h3>Links de pagamento ativos</h3>
+          <div className="stack-list">
+            {pendingPaymentOrders.length === 0 ? (
+              <p>Nenhum checkout pendente no momento.</p>
+            ) : (
+              pendingPaymentOrders.map((order) => (
+                <div className="line-card" key={order.id}>
+                  <div>
+                    <strong>{formatCurrency(order.amount)}</strong>
+                    <p>{order.provider_external_id ?? order.provider}</p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                </div>
+              ))
+            )}
+          </div>
+        </article>
+      </div>
+
+      <article className="card">
+        <h3>Pagamentos aguardando ação interna</h3>
+        <div className="stack-list">
+          {pendingPayments.length === 0 ? (
+            <p>Nenhum pagamento pendente no momento.</p>
+          ) : (
+            pendingPayments.map((payment) => (
+              <div className="line-card" key={payment.id}>
+                <div>
+                  <strong>{formatCurrency(payment.amount)}</strong>
+                  <p>{payment.provider_reference ?? payment.provider ?? 'Sem referência'}</p>
+                </div>
+                <StatusBadge status={payment.status} />
+              </div>
+            ))
+          )}
+        </div>
+      </article>
     </div>
   )
 }

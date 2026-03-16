@@ -151,7 +151,7 @@ export default function ReservationsPage() {
       }
 
       if (editingReservation) {
-        await updateReservation({ id: editingReservation.id, ...payload })
+        await updateReservation(editingReservation.id, payload)
         setSuccess('Reserva atualizada com sucesso.')
       } else {
         await createReservation(payload)
@@ -199,9 +199,9 @@ export default function ReservationsPage() {
         reservationId: reservation.id,
         amount,
         expiresInMinutes: 30,
-        description: `Entrada da reserva ${reservation.event_date}`,
+        title: `Entrada da reserva ${reservation.event_date}`,
       })
-      setPixPreviewOrder(result.paymentOrder)
+      setPixPreviewOrder(result.paymentOrder as PaymentOrder)
       setSuccess('Cobrança Pix gerada com sucesso. Exiba o QR Code ao cliente ou use o link seguro.')
       await loadData()
     } catch (serviceError) {
@@ -433,27 +433,27 @@ const paymentOrdersMap = useMemo(() => {
                 const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
                 return (
                   <tr key={reservation.id}>
-                    <td>
+                    <td data-label="Cliente">
                       <strong>{reservation.customer_name}</strong>
                       <div className="table-helper">{reservation.customer_phone}</div>
                       <div className="table-helper">{reservation.customer_email ?? 'Sem e-mail'}</div>
                     </td>
-                    <td>
+                    <td data-label="Evento">
                       <strong>{formatDate(reservation.event_date)}</strong>
                       <div className="table-helper">{reservation.event_type ?? 'Evento privado'}</div>
                       {lockedReservationIds.includes(reservation.id) ? <div className="table-helper">Data travada por assinatura</div> : null}
                     </td>
-                    <td>
+                    <td data-label="Financeiro">
                       <div className="stack-list compact-stack">
                         <span>Total: {formatCurrency(reservation.total_amount)}</span>
                         <span>Entrada: {formatCurrency(reservation.entry_amount)}</span>
                         <span>Saldo: {formatCurrency(reservation.remaining_amount)}</span>
                       </div>
                     </td>
-                    <td>
+                    <td data-label="Status">
                       <StatusBadge status={reservation.status} />
                     </td>
-                    <td>
+                    <td data-label="Checkout ativo">
                       {paymentOrder ? (
                         <div className="stack-list compact-stack">
                           <StatusBadge status={paymentOrder.status} />
@@ -466,7 +466,7 @@ const paymentOrdersMap = useMemo(() => {
                         '-'
                       )}
                     </td>
-                    <td>
+                    <td data-label="Ações">
                       <div className="table-actions">
                         <button className="button button-secondary" type="button" onClick={() => fillFormFromReservation(reservation)}>
                           Editar

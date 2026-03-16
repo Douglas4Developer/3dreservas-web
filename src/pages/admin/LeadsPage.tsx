@@ -19,10 +19,7 @@ export default function LeadsPage() {
 
   return (
     <div className="stack-lg">
-      <PageHeader
-        title="Interesses recebidos"
-        description="Leads gerados pelo site público, WhatsApp ou operação manual."
-      />
+      <PageHeader title="Interesses recebidos" description="Leads gerados pelo site público, WhatsApp ou operação manual." />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
@@ -45,14 +42,14 @@ export default function LeadsPage() {
             <tbody>
               {leads.map((lead) => (
                 <tr key={lead.id}>
-                  <td>
+                  <td data-label="Cliente">
                     <strong>{lead.customer_name}</strong>
                     <div className="table-helper">{lead.customer_email ?? 'Sem e-mail'}</div>
                   </td>
-                  <td>{formatPhone(lead.customer_phone)}</td>
-                  <td>{formatDate(lead.desired_date)}</td>
-                  <td>{lead.source}</td>
-                  <td>
+                  <td data-label="Contato">{formatPhone(lead.customer_phone)}</td>
+                  <td data-label="Data desejada">{formatDate(lead.desired_date)}</td>
+                  <td data-label="Origem">{lead.source}</td>
+                  <td data-label="Status">
                     <StatusBadge status={lead.status} />
                   </td>
                 </tr>

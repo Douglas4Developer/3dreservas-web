@@ -1,6 +1,6 @@
 import { mockPaymentOrders } from '../lib/mock'
 import { invokeEdgeFunction, isSupabaseConfigured, supabase } from '../lib/supabase'
-import type { CreatePaymentOrderInput, CreatePixPaymentInput, PaymentOrder } from '../types/database'
+import type { CreatePaymentOrderInput, PaymentOrder } from '../types/database'
 
 export async function fetchPaymentOrders(): Promise<PaymentOrder[]> {
   if (!isSupabaseConfigured || !supabase) return mockPaymentOrders
@@ -32,7 +32,6 @@ export async function createPaymentOrder(input: CreatePaymentOrderInput) {
       id: `po-${Date.now()}`,
       reservation_id: input.reservationId,
       amount: input.amount,
-      checkout_type: input.checkoutType ?? 'card',
       expires_at: new Date(Date.now() + 1000 * 60 * (input.expiresInMinutes ?? 60)).toISOString(),
     }
 
@@ -43,38 +42,46 @@ export async function createPaymentOrder(input: CreatePaymentOrderInput) {
   }
 
   return invokeEdgeFunction<{ paymentOrder: PaymentOrder; paymentUrl?: string }>('create-payment-order', {
-    body: {
-      ...input,
-      checkoutType: input.checkoutType ?? 'card',
-    },
+    body: input,
   })
 }
 
-export async function createPixPayment(input: CreatePixPaymentInput) {
+export async function createPixPayment(input: {
+  reservationId: string
+  amount: number
+  expiresInMinutes?: number
+  title?: string
+}) {
   if (!isSupabaseConfigured || !supabase) {
     const order = {
       ...mockPaymentOrders[0],
-      id: `po-pix-${Date.now()}`,
+      id: `po-${Date.now()}`,
       reservation_id: input.reservationId,
       amount: input.amount,
-      checkout_type: 'pix' as const,
-      pix_copy_paste: '00020126580014BR.GOV.BCB.PIX0136pix-demo-3deventos5204000053039865405300.005802BR5920Douglas 3DEventos6009SaoPaulo62070503***6304ABCD',
-      qr_code_base64: '',
-      expires_at: new Date(Date.now() + 1000 * 60 * (input.expiresInMinutes ?? 30)).toISOString(),
+      checkout_type: 'pix',
+      expires_at: new Date(Date.now() + 1000 * 60 * (input.expiresInMinutes ?? 60)).toISOString(),
+      pix_qr_code: 'mock-qr-code',
+      pix_copy_paste: 'mock-copy-paste',
     }
 
     return {
       paymentOrder: order,
-      pixCopyPaste: order.pix_copy_paste,
-      qrCodeBase64: order.qr_code_base64,
+      paymentId: 'mock-payment-id',
+      qrCode: 'mock-qr-code',
+      qrCodeBase64: 'mock-base64',
+      pixCopyPaste: 'mock-copy-paste',
+      ticketUrl: 'mock-url',
+      statusUrl: 'mock-status-url',
     }
   }
 
   return invokeEdgeFunction<{
     paymentOrder: PaymentOrder
-    pixCopyPaste?: string | null
-    qrCodeBase64?: string | null
-  }>('create-pix-payment', {
-    body: input,
-  })
+    paymentId: string
+    qrCode: string
+    qrCodeBase64: string
+    pixCopyPaste: string
+    ticketUrl: string
+    statusUrl: string
+  }>('create-pix-payment', { body: input })
 }

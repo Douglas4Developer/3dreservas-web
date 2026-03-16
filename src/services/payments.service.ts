@@ -23,16 +23,11 @@ export async function confirmManualPayment(input: {
   paymentMethodLabel?: string
   confirmationNotes?: string
 }) {
-  if (!isSupabaseConfigured || !supabase) {
-    return { ok: true, statusUrl: '#', contractViewUrl: '#', contractSignUrl: '#' }
-  }
-
   return invokeEdgeFunction<{
     ok: boolean
+    contract: any
     statusUrl: string
     contractViewUrl: string
     contractSignUrl: string
-  }>('confirm-manual-payment', {
-    body: input,
-  })
+  }>('confirm-manual-payment', { body: input })
 }
