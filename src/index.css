@@ -506,8 +506,26 @@ textarea {
 .status-assinado,
 .legend-item--reservado,
 .calendar-day--reservado {
-  background: rgba(15, 157, 88, 0.15);
-  color: #0f9d58;
+  background: rgba(15, 80, 50, 0.25);
+  color: #0d5a3d;
+  position: relative;
+}
+
+.calendar-day--reservado::after {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 24px;
+  height: 24px;
+  background: #0d5a3d;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  font-weight: bold;
 }
 
 .status-perdido,
