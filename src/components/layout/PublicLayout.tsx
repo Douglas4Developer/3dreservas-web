@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { isSupabaseConfigured } from '../../lib/supabase'
 
