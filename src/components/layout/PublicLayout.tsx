@@ -84,7 +84,7 @@ export default function PublicLayout() {
             <p>Vitrine, agenda, pagamento, contrato e acompanhamento da reserva em um só lugar.</p>
           </div>
           <div>
-            <p>3Deventos • Goiânia</p>
+            <p>3Deventos • Goiânia • Site desenvolvido por DOUGLAS S S FERREIRA. </p>
             <p>Experiência pensada para converter consultas em reservas.</p>
           </div>
         </div>
