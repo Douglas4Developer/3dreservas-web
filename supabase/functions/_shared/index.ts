@@ -24,6 +24,9 @@ interface ContractPdfReservation {
   customer_address?: string | null
   event_type?: string | null
   event_date: string
+  end_date?: string | null
+  days_count?: number | null
+  daily_rate?: number | null
   period_start?: string | null
   period_end?: string | null
   total_amount?: number | null
@@ -103,6 +106,26 @@ function formatDateTime(value?: string | null) {
   return new Date(value).toLocaleString('pt-BR')
 }
 
+function formatDateOnly(value?: string | null) {
+  if (!value) return 'Não informado'
+  return new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR')
+}
+
+function differenceInDaysInclusive(startDate?: string | null, endDate?: string | null) {
+  if (!startDate) return 1
+  const effectiveEndDate = endDate || startDate
+  const start = new Date(`${startDate}T00:00:00`).getTime()
+  const end = new Date(`${effectiveEndDate}T00:00:00`).getTime()
+  return Math.max(Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1, 1)
+}
+
+function formatDateRangeText(startDate?: string | null, endDate?: string | null) {
+  if (!startDate) return 'Não informado'
+  const effectiveEndDate = endDate || startDate
+  if (effectiveEndDate === startDate) return formatDateOnly(startDate)
+  return `${formatDateOnly(startDate)} até ${formatDateOnly(effectiveEndDate)}`
+}
+
 function stripHtml(html?: string | null) {
   if (!html) return ''
   return html
@@ -126,6 +149,8 @@ export function buildContractHtml(reservation: ContractPdfReservation) {
   const entryAmount = Number(reservation.entry_amount ?? 0)
   const remainingAmount = Number(reservation.remaining_amount ?? totalAmount - entryAmount)
   const cleaningFee = Number(reservation.cleaning_fee ?? 100)
+  const daysCount = Number(reservation.days_count ?? differenceInDaysInclusive(reservation.event_date, reservation.end_date))
+  const dailyRate = Number(reservation.daily_rate ?? (daysCount > 0 ? totalAmount / daysCount : 0))
   const imageClause = reservation.image_use_authorized === false
     ? 'O LOCATÁRIO não autoriza o uso de imagens do evento para fins de divulgação.'
     : 'O LOCATÁRIO autoriza o uso de imagens do evento para fins de divulgação, salvo oposição expressa por escrito.'
@@ -142,11 +167,13 @@ export function buildContractHtml(reservation: ContractPdfReservation) {
     <p>O presente contrato tem por objeto a locação do espaço físico 3Deventos, localizado em ${reservation.venue_address_snapshot ?? 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia – GO'}, para realização de evento de natureza ${reservation.event_type ?? 'evento privado'}.</p>
 
     <h2 style="margin-top: 24px;">2. Prazo da locação</h2>
-    <p>A locação será válida para o dia <strong>${reservation.event_date}</strong>, com início às <strong>${reservation.period_start ?? '09:00'}</strong> e término às <strong>${reservation.period_end ?? '23:00'}</strong>.</p>
+    <p>A locação compreenderá o período de <strong>${formatDateRangeText(reservation.event_date, reservation.end_date)}</strong>, totalizando <strong>${daysCount} ${daysCount === 1 ? 'dia' : 'dias'}</strong>, com início diário às <strong>${reservation.period_start ?? '09:00'}</strong> e término às <strong>${reservation.period_end ?? '23:00'}</strong>.</p>
 
     <h2 style="margin-top: 24px;">3. Valores e pagamentos</h2>
     <ul>
-      <li><strong>Valor total:</strong> ${formatCurrency(totalAmount)}</li>
+      <li><strong>Valor da diária:</strong> ${formatCurrency(dailyRate)}</li>
+      <li><strong>Quantidade de diárias:</strong> ${daysCount}</li>
+      <li><strong>Valor total da locação:</strong> ${formatCurrency(totalAmount)}</li>
       <li><strong>Entrada / reserva:</strong> ${formatCurrency(entryAmount)}</li>
       <li><strong>Saldo restante:</strong> ${formatCurrency(remainingAmount)}</li>
       <li><strong>Taxa de limpeza:</strong> ${formatCurrency(cleaningFee)} caso o espaço não seja devolvido nas mesmas condições de limpeza.</li>
@@ -191,6 +218,58 @@ export function buildContractHtml(reservation: ContractPdfReservation) {
   `.trim()
 }
 
+export function buildAddendumHtml(params: {
+  reservation: ContractPdfReservation
+  previousEndDate: string
+  newEndDate: string
+  extraDays: number
+  amountPerDay: number
+  extraAmount: number
+  newTotalAmount: number
+  notes?: string | null
+}) {
+  return `
+  <article style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.7; max-width: 900px; margin: 0 auto; padding: 24px;">
+    <h1 style="font-size: 28px; margin-bottom: 8px;">TERMO ADITIVO DE LOCAÇÃO – 3DEventos</h1>
+    <p>Documento gerado automaticamente pelo 3DReservas para formalizar a prorrogação da reserva.</p>
+
+    <p><strong>LOCATÁRIO:</strong> ${params.reservation.customer_name}, telefone ${params.reservation.customer_phone}, CPF nº ${params.reservation.customer_document ?? 'não informado'}.</p>
+    <p><strong>Período original:</strong> ${formatDateRangeText(params.reservation.event_date, params.previousEndDate)}</p>
+    <p><strong>Novo período:</strong> ${formatDateRangeText(params.reservation.event_date, params.newEndDate)}</p>
+
+    <h2 style="margin-top: 24px;">1. Prorrogação</h2>
+    <p>Fica ajustada a prorrogação da locação por <strong>${params.extraDays} ${params.extraDays === 1 ? 'dia adicional' : 'dias adicionais'}</strong>, alterando a data final da reserva para <strong>${formatDateOnly(params.newEndDate)}</strong>.</p>
+
+    <h2 style="margin-top: 24px;">2. Valores adicionais</h2>
+    <ul>
+      <li><strong>Valor por diária adicional:</strong> ${formatCurrency(params.amountPerDay)}</li>
+      <li><strong>Valor adicional deste aditivo:</strong> ${formatCurrency(params.extraAmount)}</li>
+      <li><strong>Novo valor total da reserva:</strong> ${formatCurrency(params.newTotalAmount)}</li>
+    </ul>
+
+    <h2 style="margin-top: 24px;">3. Ratificação</h2>
+    <p>Permanecem válidas as demais cláusulas do contrato original que não conflitem com este aditivo.</p>
+
+    <h2 style="margin-top: 24px;">4. Observações</h2>
+    <p>${params.notes ?? 'Sem observações adicionais.'}</p>
+
+    <div style="margin-top: 48px; display: grid; gap: 32px; grid-template-columns: 1fr 1fr;">
+      <div>
+        <p><strong>LOCADOR</strong></p>
+        <p>___________________________________</p>
+        <p>Douglas Soares de Souza Ferreira</p>
+      </div>
+      <div>
+        <p><strong>LOCATÁRIO</strong></p>
+        <p>___________________________________</p>
+        <p>${params.reservation.customer_name}</p>
+      </div>
+    </div>
+    <p style="margin-top: 40px; color: #6b7280;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+  </article>
+  `.trim()
+}
+
 function buildContractSections(reservation: ContractPdfReservation, contract: ContractPdfContract) {
   const totalAmount = Number(reservation.total_amount ?? 0)
   const entryAmount = Number(reservation.entry_amount ?? 0)
@@ -215,12 +294,14 @@ function buildContractSections(reservation: ContractPdfReservation, contract: Co
       title: 'Objeto e período',
       body: [
         `Locação do espaço 3Deventos em ${reservation.venue_address_snapshot ?? 'Jardim Bonanza, Goiânia - GO'} para ${reservation.event_type ?? 'evento privado'}.`,
-        `Data do evento: ${reservation.event_date}. Horário: ${reservation.period_start ?? '09:00'} até ${reservation.period_end ?? '23:00'}.`,
+        `Período da reserva: ${formatDateRangeText(reservation.event_date, reservation.end_date)}.`,
+        `Quantidade de diárias: ${differenceInDaysInclusive(reservation.event_date, reservation.end_date)}. Horário diário: ${reservation.period_start ?? '09:00'} até ${reservation.period_end ?? '23:00'}.`,
       ].join(' '),
     },
     {
       title: 'Valores',
       body: [
+        `Valor da diária: ${formatCurrency(Number(reservation.daily_rate ?? (differenceInDaysInclusive(reservation.event_date, reservation.end_date) > 0 ? totalAmount / differenceInDaysInclusive(reservation.event_date, reservation.end_date) : 0)))}.`,
         `Valor total: ${formatCurrency(totalAmount)}.`,
         `Entrada: ${formatCurrency(entryAmount)}.`,
         `Saldo restante: ${formatCurrency(remainingAmount)}.`,

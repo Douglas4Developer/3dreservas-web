@@ -75,3 +75,37 @@ export function sanitizeFileName(value: string) {
     .replace(/-+/g, '-')
     .toLowerCase()
 }
+
+export function addDaysToDateString(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + days)
+  return [date.getFullYear(), `${date.getMonth() + 1}`.padStart(2, '0'), `${date.getDate()}`.padStart(2, '0')].join('-')
+}
+
+export function differenceInDaysInclusive(startDate?: string | null, endDate?: string | null) {
+  if (!startDate) return 0
+  const effectiveEndDate = endDate || startDate
+  const start = new Date(`${startDate}T00:00:00`).getTime()
+  const end = new Date(`${effectiveEndDate}T00:00:00`).getTime()
+  const diff = Math.round((end - start) / (1000 * 60 * 60 * 24))
+  return Math.max(diff + 1, 1)
+}
+
+export function formatDateRange(startDate?: string | null, endDate?: string | null) {
+  if (!startDate) return '-'
+  const effectiveEndDate = endDate || startDate
+  if (effectiveEndDate === startDate) return formatDate(startDate)
+  return `${formatDate(startDate)} até ${formatDate(effectiveEndDate)}`
+}
+
+export function describeReservationDays(startDate?: string | null, endDate?: string | null, daysCount?: number | null) {
+  const totalDays = daysCount ?? differenceInDaysInclusive(startDate, endDate)
+  return `${totalDays} ${totalDays === 1 ? 'dia' : 'dias'}`
+}
+
+export function isDateWithinRange(date: string, startDate?: string | null, endDate?: string | null) {
+  if (!startDate) return false
+  const effectiveEndDate = endDate || startDate
+  return date >= startDate && date <= effectiveEndDate
+}

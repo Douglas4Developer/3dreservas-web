@@ -19,6 +19,7 @@ Deploy these functions from your terminal:
 supabase functions deploy create-payment-order
 supabase functions deploy mercado-pago-webhook
 supabase functions deploy generate-contract
+supabase functions deploy create-reservation-addendum
 supabase functions deploy register-signature
 supabase functions deploy send-whatsapp-template
 supabase functions deploy expire-reservations
@@ -51,6 +52,6 @@ Option B: schedule the Edge Function every 5 minutes.
 2. Deploy `create-payment-order`
 3. Configure Mercado Pago webhook pointing to:
    - `https://YOUR_PROJECT.supabase.co/functions/v1/mercado-pago-webhook`
-4. Deploy `generate-contract` and `register-signature`
+4. Deploy `generate-contract`, `create-reservation-addendum` and `register-signature`
 5. Publish photos/videos in `Admin > Mídia`
 6. Enable cron expiration

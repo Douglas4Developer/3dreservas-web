@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { formatCountdown, formatCurrency, formatDate, formatDateTime } from '../../lib/format'
+import { describeReservationDays, formatCountdown, formatCurrency, formatDateRange, formatDateTime } from '../../lib/format'
 import { fetchReservationLookupByToken } from '../../services/reservations.service'
 import type { ReservationLookup } from '../../types/database'
 
@@ -53,8 +53,12 @@ export default function ReservationLookupPage() {
               <strong>{lookup.reservation.customer_name}</strong>
             </div>
             <div>
-              <span>Data do evento</span>
-              <strong>{formatDate(lookup.reservation.event_date)}</strong>
+              <span>Período</span>
+              <strong>{formatDateRange(lookup.reservation.event_date, lookup.reservation.end_date)}</strong>
+            </div>
+            <div>
+              <span>Duração</span>
+              <strong>{describeReservationDays(lookup.reservation.event_date, lookup.reservation.end_date, lookup.reservation.days_count)}</strong>
             </div>
             <div>
               <span>Status da reserva</span>
@@ -67,6 +71,10 @@ export default function ReservationLookupPage() {
             <div>
               <span>Entrada</span>
               <strong>{formatCurrency(lookup.reservation.entry_amount)}</strong>
+            </div>
+            <div>
+              <span>Saldo restante</span>
+              <strong>{formatCurrency(lookup.reservation.remaining_amount)}</strong>
             </div>
             <div>
               <span>Última atualização</span>
@@ -123,7 +131,7 @@ export default function ReservationLookupPage() {
               <div className="line-card">
                 <div>
                   <strong>Versão {lookup.contract.version}</strong>
-                  <p>Status atual do contrato</p>
+                  <p>Status atual do documento</p>
                 </div>
                 <StatusBadge status={lookup.contract.status} />
               </div>
@@ -138,6 +146,23 @@ export default function ReservationLookupPage() {
           ) : (
             <p>Contrato ainda não gerado para esta reserva.</p>
           )}
+
+          {lookup.addendums.length > 0 ? (
+            <>
+              <h2>Aditivos</h2>
+              <div className="stack-list">
+                {lookup.addendums.map((addendum) => (
+                  <div className="line-card" key={addendum.id}>
+                    <div>
+                      <strong>Aditivo #{addendum.addendum_number}</strong>
+                      <p>{formatDateRange(lookup.reservation.event_date, addendum.new_end_date)}</p>
+                    </div>
+                    <span className="status-badge status-reservado">+{formatCurrency(addendum.extra_amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
         </article>
       </div>
     </section>

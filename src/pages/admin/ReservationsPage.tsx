@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { formatCountdown, formatCurrency, formatDate } from '../../lib/format'
+import {
+  addDaysToDateString,
+  describeReservationDays,
+  differenceInDaysInclusive,
+  formatCountdown,
+  formatCurrency,
+  formatDateRange,
+} from '../../lib/format'
 import { subscribeToTables } from '../../lib/realtime'
+import { fetchContracts } from '../../services/contracts.service'
 import { getDefaultSpaceId } from '../../services/leads.service'
 import { createPaymentOrder, createPixPayment, fetchPaymentOrders } from '../../services/payment-orders.service'
 import { confirmManualPayment } from '../../services/payments.service'
+import { createReservationAddendum } from '../../services/reservation-addendums.service'
 import { createReservation, fetchReservations, updateReservation } from '../../services/reservations.service'
-import { fetchContracts } from '../../services/contracts.service'
 import { fetchSignatures } from '../../services/signatures.service'
 import type { PaymentOrder, Reservation, ReservationStatus } from '../../types/database'
 
@@ -27,6 +35,9 @@ const initialForm = {
   customer_address: '',
   event_type: '',
   event_date: '',
+  end_date: '',
+  days_count: '1',
+  daily_rate: '',
   period_start: '09:00',
   period_end: '23:00',
   total_amount: '',
@@ -90,10 +101,46 @@ export default function ReservationsPage() {
     void loadData()
   }, [])
 
-  useEffect(() => subscribeToTables(['reservations', 'payment_orders', 'payments', 'contracts'], () => void loadData()), [])
+  useEffect(() => subscribeToTables(['reservations', 'payment_orders', 'payments', 'contracts', 'reservation_addendums'], () => void loadData()), [])
+
+  function recalculateFinancialFields(nextForm: typeof initialForm) {
+    const daysCount = Math.max(Number(nextForm.days_count || '1'), 1)
+    const dailyRate = nextForm.daily_rate ? Number(nextForm.daily_rate) : 0
+    const entryAmount = nextForm.entry_amount ? Number(nextForm.entry_amount) : 0
+    const totalAmount = dailyRate > 0 ? dailyRate * daysCount : nextForm.total_amount ? Number(nextForm.total_amount) : 0
+
+    return {
+      ...nextForm,
+      total_amount: totalAmount > 0 ? totalAmount.toString() : nextForm.total_amount,
+      remaining_amount: totalAmount > 0 ? Math.max(totalAmount - entryAmount, 0).toString() : nextForm.remaining_amount,
+    }
+  }
 
   function updateField(field: keyof typeof initialForm, value: string) {
-    setForm((current) => ({ ...current, [field]: value }))
+    setForm((current) => {
+      const next = { ...current, [field]: value }
+
+      if (field === 'event_date') {
+        const daysCount = Math.max(Number(next.days_count || '1'), 1)
+        next.end_date = value ? addDaysToDateString(value, daysCount - 1) : ''
+      }
+
+      if (field === 'days_count') {
+        const daysCount = Math.max(Number(value || '1'), 1)
+        next.days_count = String(daysCount)
+        if (next.event_date) next.end_date = addDaysToDateString(next.event_date, daysCount - 1)
+      }
+
+      if (field === 'end_date' && next.event_date && value) {
+        next.days_count = String(differenceInDaysInclusive(next.event_date, value))
+      }
+
+      if (field === 'daily_rate' || field === 'days_count' || field === 'entry_amount') {
+        return recalculateFinancialFields(next)
+      }
+
+      return next
+    })
   }
 
   function resetForm() {
@@ -113,6 +160,9 @@ export default function ReservationsPage() {
       customer_address: reservation.customer_address ?? '',
       event_type: reservation.event_type ?? '',
       event_date: reservation.event_date,
+      end_date: reservation.end_date ?? reservation.event_date,
+      days_count: String(reservation.days_count ?? differenceInDaysInclusive(reservation.event_date, reservation.end_date)),
+      daily_rate: reservation.daily_rate?.toString() ?? '',
       period_start: reservation.period_start,
       period_end: reservation.period_end,
       total_amount: reservation.total_amount?.toString() ?? '',
@@ -139,6 +189,9 @@ export default function ReservationsPage() {
         customer_address: form.customer_address || undefined,
         event_type: form.event_type || undefined,
         event_date: form.event_date,
+        end_date: form.end_date || form.event_date,
+        days_count: form.days_count ? Number(form.days_count) : undefined,
+        daily_rate: form.daily_rate ? Number(form.daily_rate) : undefined,
         period_start: form.period_start,
         period_end: form.period_end,
         total_amount: form.total_amount ? Number(form.total_amount) : undefined,
@@ -242,6 +295,48 @@ export default function ReservationsPage() {
     }
   }
 
+  async function handleCreateAddendum(reservation: Reservation) {
+    const extraDaysText = window.prompt('Quantos dias adicionais deseja incluir?', '1')
+    if (!extraDaysText) return
+
+    const extraDays = Number(extraDaysText)
+    if (!Number.isFinite(extraDays) || extraDays <= 0) {
+      setError('Informe uma quantidade de dias válida para o aditivo.')
+      return
+    }
+
+    const suggestedAmountPerDay = reservation.daily_rate ?? (reservation.total_amount ?? 0) / Math.max(reservation.days_count ?? 1, 1)
+    const amountPerDayText = window.prompt('Valor por dia adicional:', suggestedAmountPerDay ? String(suggestedAmountPerDay) : '0')
+    if (!amountPerDayText) return
+
+    const amountPerDay = Number(amountPerDayText)
+    if (!Number.isFinite(amountPerDay) || amountPerDay < 0) {
+      setError('Informe um valor por dia válido para o aditivo.')
+      return
+    }
+
+    const notes = window.prompt('Observações do termo aditivo (opcional):', 'Prorrogação da reserva com diária adicional.') ?? ''
+
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const result = await createReservationAddendum({
+        reservationId: reservation.id,
+        extraDays,
+        amountPerDay,
+        notes,
+      })
+
+      setSuccess(
+        `Aditivo gerado com sucesso. Novo período: ${formatDateRange(result.reservation.event_date, result.reservation.end_date)} • valor adicional: ${formatCurrency(result.addendum.extra_amount)}`,
+      )
+      await loadData()
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao gerar termo aditivo.')
+    }
+  }
+
   async function handleCopyPix() {
     if (!pixPreviewOrder?.pix_copy_paste) return
     await navigator.clipboard.writeText(pixPreviewOrder.pix_copy_paste)
@@ -249,26 +344,29 @@ export default function ReservationsPage() {
     window.setTimeout(() => setCopiedPixCode(false), 1800)
   }
 
-const paymentOrdersMap = useMemo(() => {
-  return paymentOrders
-    .filter((item) => item.status === 'pending')
-    .reduce<Record<string, PaymentOrder>>((accumulator, item) => {
-      if (
-        !accumulator[item.reservation_id] ||
-        accumulator[item.reservation_id].created_at < item.created_at
-      ) {
-        accumulator[item.reservation_id] = item
-      }
+  const paymentOrdersMap = useMemo(() => {
+    return paymentOrders
+      .filter((item) => item.status === 'pending')
+      .reduce<Record<string, PaymentOrder>>((accumulator, item) => {
+        if (!accumulator[item.reservation_id] || accumulator[item.reservation_id].created_at < item.created_at) {
+          accumulator[item.reservation_id] = item
+        }
 
-      return accumulator
-    }, {})
-}, [paymentOrders])
+        return accumulator
+      }, {})
+  }, [paymentOrders])
+
+  const suggestedTotal = useMemo(() => {
+    const daysCount = Math.max(Number(form.days_count || '1'), 1)
+    const dailyRate = form.daily_rate ? Number(form.daily_rate) : 0
+    return dailyRate > 0 ? dailyRate * daysCount : null
+  }, [form.daily_rate, form.days_count])
 
   return (
     <div className="stack-lg">
       <PageHeader
         title="Reservas"
-        description="Gestão completa do cliente, valores, checkout por cartão, Pix dedicado, pagamento manual e edição dos dados contratuais."
+        description="Gestão completa do cliente, valores, período com vários dias, prorrogação por aditivo, checkout por cartão, Pix dedicado e edição dos dados contratuais."
       />
 
       <div className="dashboard-grid reservations-admin-grid">
@@ -308,7 +406,7 @@ const paymentOrdersMap = useMemo(() => {
                 <input value={form.event_type} onChange={(event) => updateField('event_type', event.target.value)} placeholder="Aniversário, confraternização..." />
               </label>
               <label>
-                Data do evento
+                Data inicial
                 <input type="date" value={form.event_date} onChange={(event) => updateField('event_date', event.target.value)} required disabled={isDateLocked} />
               </label>
               <label>
@@ -320,6 +418,21 @@ const paymentOrdersMap = useMemo(() => {
                     </option>
                   ))}
                 </select>
+              </label>
+            </div>
+
+            <div className="inline-form-grid inline-form-grid--three">
+              <label>
+                Data final
+                <input type="date" value={form.end_date} onChange={(event) => updateField('end_date', event.target.value)} required disabled={isDateLocked} />
+              </label>
+              <label>
+                Quantidade de dias
+                <input type="number" min="1" value={form.days_count} onChange={(event) => updateField('days_count', event.target.value)} disabled={isDateLocked} />
+              </label>
+              <label>
+                Valor da diária
+                <input type="number" min="0" step="0.01" value={form.daily_rate} onChange={(event) => updateField('daily_rate', event.target.value)} />
               </label>
             </div>
 
@@ -352,6 +465,18 @@ const paymentOrdersMap = useMemo(() => {
                 <input type="number" min="0" step="0.01" value={form.remaining_amount} onChange={(event) => updateField('remaining_amount', event.target.value)} />
               </label>
             </div>
+
+            {suggestedTotal !== null ? (
+              <div className="line-card">
+                <div>
+                  <strong>Total calculado pela diária</strong>
+                  <p>
+                    {form.days_count} × {formatCurrency(Number(form.daily_rate || 0))} = {formatCurrency(suggestedTotal)}
+                  </p>
+                </div>
+                <span className="status-badge status-reservado">{form.days_count} dia(s)</span>
+              </div>
+            ) : null}
 
             <label>
               Observações
@@ -420,7 +545,7 @@ const paymentOrdersMap = useMemo(() => {
             <thead>
               <tr>
                 <th>Cliente</th>
-                <th>Evento</th>
+                <th>Período</th>
                 <th>Financeiro</th>
                 <th>Status</th>
                 <th>Checkout ativo</th>
@@ -438,10 +563,11 @@ const paymentOrdersMap = useMemo(() => {
                       <div className="table-helper">{reservation.customer_phone}</div>
                       <div className="table-helper">{reservation.customer_email ?? 'Sem e-mail'}</div>
                     </td>
-                    <td data-label="Evento">
-                      <strong>{formatDate(reservation.event_date)}</strong>
-                      <div className="table-helper">{reservation.event_type ?? 'Evento privado'}</div>
-                      {lockedReservationIds.includes(reservation.id) ? <div className="table-helper">Data travada por assinatura</div> : null}
+                    <td data-label="Período">
+                      <strong>{formatDateRange(reservation.event_date, reservation.end_date)}</strong>
+                      <div className="table-helper">{describeReservationDays(reservation.event_date, reservation.end_date, reservation.days_count)}</div>
+                      <div className="table-helper">Diária: {formatCurrency(reservation.daily_rate)}</div>
+                      {lockedReservationIds.includes(reservation.id) ? <div className="table-helper">Período travado por assinatura</div> : null}
                     </td>
                     <td data-label="Financeiro">
                       <div className="stack-list compact-stack">
@@ -471,6 +597,9 @@ const paymentOrdersMap = useMemo(() => {
                         <button className="button button-secondary" type="button" onClick={() => fillFormFromReservation(reservation)}>
                           Editar
                         </button>
+                        <button className="button button-secondary" type="button" onClick={() => void handleCreateAddendum(reservation)}>
+                          Gerar aditivo
+                        </button>
                         <button
                           className="button button-secondary"
                           type="button"
@@ -495,12 +624,7 @@ const paymentOrdersMap = useMemo(() => {
                         >
                           {creatingPaymentFor === `${reservation.id}-card` ? 'Gerando cartão...' : 'Gerar Cartão'}
                         </button>
-                        <a
-                          className="button button-secondary"
-                          href={`/minha-reserva/${reservation.public_link_token}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                        <a className="button button-secondary" href={`/minha-reserva/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
                           Link do cliente
                         </a>
                       </div>

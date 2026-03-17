@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { formatDateTime } from '../../lib/format'
+import { formatCurrency, formatDateRange, formatDateTime } from '../../lib/format'
 import { fetchReservationLookupByToken } from '../../services/reservations.service'
 import { registerPublicSignature } from '../../services/signatures.service'
 import type { ReservationLookup } from '../../types/database'
@@ -81,7 +81,10 @@ export default function ContractPage() {
           <div className="line-card">
             <div>
               <h1>Contrato da reserva</h1>
-              <p>Pagamento confirmado, contrato liberado para assinatura eletrônica simples.</p>
+              <p>
+                Período: {formatDateRange(lookup.reservation.event_date, lookup.reservation.end_date)} • Total atualizado:{' '}
+                {formatCurrency(lookup.reservation.total_amount)}
+              </p>
             </div>
             {lookup.contract ? <StatusBadge status={lookup.contract.status} /> : null}
           </div>
@@ -97,6 +100,21 @@ export default function ContractPage() {
               <p>O conteúdo do contrato ainda está sendo preparado.</p>
             )}
           </div>
+
+          {lookup.addendums.length > 0 ? (
+            <div className="stack-list" style={{ marginTop: 24 }}>
+              <h2>Histórico de aditivos</h2>
+              {lookup.addendums.map((addendum) => (
+                <div className="line-card" key={addendum.id}>
+                  <div>
+                    <strong>Aditivo #{addendum.addendum_number}</strong>
+                    <p>{formatDateRange(lookup.reservation.event_date, addendum.new_end_date)}</p>
+                  </div>
+                  <span className="status-badge status-reservado">+{formatCurrency(addendum.extra_amount)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </article>
 
         <aside className="card details-card">

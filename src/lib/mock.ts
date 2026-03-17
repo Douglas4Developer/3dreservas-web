@@ -1,3 +1,4 @@
+import { addDaysToDateString } from './format'
 import type {
   CalendarDay,
   Contract,
@@ -6,6 +7,7 @@ import type {
   Payment,
   PaymentOrder,
   Reservation,
+  ReservationAddendum,
   ReservationLookup,
   SecureLink,
   Signature,
@@ -60,6 +62,11 @@ export const mockLeads: Lead[] = [
   },
 ]
 
+const res1Start = addDays(14)
+const res2Start = addDays(20)
+const res2End = addDaysToDateString(res2Start, 1)
+const res3Start = addDays(28)
+
 export const mockReservations: Reservation[] = [
   {
     id: 'res-1',
@@ -70,14 +77,17 @@ export const mockReservations: Reservation[] = [
     customer_email: 'carlos@email.com',
     customer_document: null,
     customer_address: null,
-    event_date: addDays(14),
+    event_date: res1Start,
+    end_date: res1Start,
+    days_count: 1,
+    daily_rate: 950,
     event_type: null,
     period_start: '09:00',
     period_end: '23:00',
     guests_expected: 60,
     total_amount: 950,
     entry_amount: 400,
-    remaining_amount: null,
+    remaining_amount: 550,
     cleaning_fee: 100,
     entry_due_at: addHours(24),
     expires_at: addMinutes(90),
@@ -100,20 +110,23 @@ export const mockReservations: Reservation[] = [
     customer_email: 'patricia@email.com',
     customer_document: null,
     customer_address: null,
-    event_date: addDays(20),
+    event_date: res2Start,
+    end_date: res2End,
+    days_count: 2,
+    daily_rate: 600,
     event_type: null,
     period_start: '09:00',
     period_end: '23:00',
     guests_expected: 80,
     total_amount: 1200,
     entry_amount: 500,
-    remaining_amount: null,
+    remaining_amount: 700,
     cleaning_fee: 100,
     entry_due_at: new Date().toISOString(),
     expires_at: null,
     status: 'reservado',
     public_link_token: 'demo-token-confirmado',
-    notes: 'Chá revelação.',
+    notes: 'Chá revelação com locação para dois dias.',
     image_use_authorized: true,
     venue_address_snapshot: 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia - GO',
     capacity_snapshot: 100,
@@ -130,14 +143,17 @@ export const mockReservations: Reservation[] = [
     customer_email: 'joao@email.com',
     customer_document: null,
     customer_address: null,
-    event_date: addDays(28),
+    event_date: res3Start,
+    end_date: res3Start,
+    days_count: 1,
+    daily_rate: 800,
     event_type: null,
     period_start: '09:00',
     period_end: '23:00',
     guests_expected: 40,
     total_amount: 800,
     entry_amount: 300,
-    remaining_amount: null,
+    remaining_amount: 500,
     cleaning_fee: 100,
     entry_due_at: new Date().toISOString(),
     expires_at: addHours(12),
@@ -147,6 +163,24 @@ export const mockReservations: Reservation[] = [
     image_use_authorized: true,
     venue_address_snapshot: 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia - GO',
     capacity_snapshot: 100,
+    created_by: 'demo-admin',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
+
+export const mockAddendums: ReservationAddendum[] = [
+  {
+    id: 'add-1',
+    reservation_id: 'res-2',
+    contract_id: 'contract-1',
+    addendum_number: 1,
+    previous_end_date: res2Start,
+    new_end_date: res2End,
+    extra_days: 1,
+    amount_per_day: 600,
+    extra_amount: 600,
+    notes: 'Cliente solicitou extensão para desmontagem no dia seguinte.',
     created_by: 'demo-admin',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -227,12 +261,12 @@ export const mockContracts: Contract[] = [
   {
     id: 'contract-1',
     reservation_id: 'res-2',
-    version: 1,
+    version: 2,
     status: 'assinado',
-    file_path: 'https://example.com/contrato-demo.html',
-    final_file_path: 'https://example.com/contrato-demo-final.html',
-    html_content: '<h1>Contrato 3Deventos</h1><p>Contrato final assinado.</p>',
-    template_key: 'default_v1',
+    file_path: 'https://example.com/aditivo-demo.html',
+    final_file_path: 'https://example.com/aditivo-demo-final.html',
+    html_content: '<h1>Termo aditivo 3Deventos</h1><p>Extensão de uma diária adicional.</p>',
+    template_key: 'reservation_addendum_v1',
     generated_at: new Date().toISOString(),
     released_at: new Date().toISOString(),
     document_hash: 'hash-demo-2',
@@ -378,10 +412,17 @@ export const mockSpaceMedia: SpaceMedia[] = [
   },
 ]
 
-export const mockCalendar: CalendarDay[] = mockReservations.map((reservation) => ({
-  event_date: reservation.event_date,
-  status: reservation.status,
-}))
+export const mockCalendar: CalendarDay[] = mockReservations.flatMap((reservation) => {
+  const endDate = reservation.end_date ?? reservation.event_date
+  const entries: CalendarDay[] = []
+  for (let current = reservation.event_date; current <= endDate; current = addDaysToDateString(current, 1)) {
+    entries.push({
+      event_date: current,
+      status: reservation.status,
+    })
+  }
+  return entries
+})
 
 export const mockLookupByToken = (token: string): ReservationLookup | null => {
   const reservation =
@@ -390,7 +431,10 @@ export const mockLookupByToken = (token: string): ReservationLookup | null => {
 
   if (!reservation) return null
 
-  const contract = mockContracts.find((item) => item.reservation_id === reservation.id) ?? null
+  const contract =
+    mockContracts
+      .filter((item) => item.reservation_id === reservation.id)
+      .sort((left, right) => right.version - left.version)[0] ?? null
 
   return {
     link_type:
@@ -403,6 +447,7 @@ export const mockLookupByToken = (token: string): ReservationLookup | null => {
       mockPaymentOrders.find((order) => order.reservation_id === reservation.id && order.status === 'pending') ?? null,
     contract,
     signatures: contract ? mockSignatures.filter((signature) => signature.contract_id === contract.id) : [],
+    addendums: mockAddendums.filter((item) => item.reservation_id === reservation.id),
   }
 }
 

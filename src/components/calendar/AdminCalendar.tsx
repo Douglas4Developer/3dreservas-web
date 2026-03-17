@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { buildMonthLabel } from '../../lib/format'
+import { buildMonthLabel, describeReservationDays, formatDateRange, isDateWithinRange } from '../../lib/format'
 import type { Reservation, ReservationStatus } from '../../types/database'
 
 interface AdminCalendarProps {
@@ -31,7 +31,9 @@ export function AdminCalendar({ referenceDate, reservations }: AdminCalendarProp
     for (let day = 1; day <= daysInMonth; day += 1) {
       const date = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), day)
       const isoDate = date.toISOString().slice(0, 10)
-      const reservation = reservations.find((item) => item.event_date === isoDate && item.status !== 'cancelado')
+      const reservation = reservations.find(
+        (item) => item.status !== 'cancelado' && isDateWithinRange(isoDate, item.event_date, item.end_date),
+      )
       items.push({ date: isoDate, dayNumber: day, reservation })
     }
 
@@ -43,7 +45,7 @@ export function AdminCalendar({ referenceDate, reservations }: AdminCalendarProp
       <div className="calendar-card__header">
         <div>
           <h3>{monthLabel}</h3>
-          <p>Visão completa do administrativo com todos os status operacionais.</p>
+          <p>Visão completa do administrativo com reservas de um ou mais dias.</p>
         </div>
       </div>
 
@@ -70,7 +72,12 @@ export function AdminCalendar({ referenceDate, reservations }: AdminCalendarProp
               <span className="calendar-day__number">{item.dayNumber}</span>
               <span className="calendar-day__status">{status ? labelMap[status] : 'Disponível'}</span>
               {item.reservation ? (
-                <span className="calendar-day__meta">{item.reservation.customer_name}</span>
+                <>
+                  <span className="calendar-day__meta">{item.reservation.customer_name}</span>
+                  <span className="calendar-day__meta">
+                    {describeReservationDays(item.reservation.event_date, item.reservation.end_date, item.reservation.days_count)}
+                  </span>
+                </>
               ) : (
                 <span className="calendar-day__action">Livre</span>
               )}
@@ -86,6 +93,23 @@ export function AdminCalendar({ referenceDate, reservations }: AdminCalendarProp
         <span className="legend-item legend-item--aguardando_pagamento">Aguardando pagamento</span>
         <span className="legend-item legend-item--reservado">Reservado</span>
         <span className="legend-item legend-item--cancelado">Cancelado</span>
+      </div>
+
+      <div className="stack-list" style={{ marginTop: 20 }}>
+        {reservations
+          .filter((reservation) => reservation.status !== 'cancelado')
+          .sort((left, right) => left.event_date.localeCompare(right.event_date))
+          .map((reservation) => (
+            <div key={reservation.id} className="line-card">
+              <div>
+                <strong>{reservation.customer_name}</strong>
+                <p>{formatDateRange(reservation.event_date, reservation.end_date)}</p>
+              </div>
+              <span className={`status-badge status-${reservation.status}`}>
+                {describeReservationDays(reservation.event_date, reservation.end_date, reservation.days_count)}
+              </span>
+            </div>
+          ))}
       </div>
     </div>
   )

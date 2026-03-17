@@ -1,6 +1,38 @@
+import { addDaysToDateString, differenceInDaysInclusive } from '../lib/format'
 import { mockLookupByToken, mockReservations, mockSpace } from '../lib/mock'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { CreateReservationInput, Reservation, ReservationLookup } from '../types/database'
+
+function normalizeReservationPayload(input: CreateReservationInput) {
+  const eventDate = input.event_date
+  const daysCount = Math.max(Number(input.days_count ?? differenceInDaysInclusive(eventDate, input.end_date)), 1)
+  const endDate = input.end_date ?? addDaysToDateString(eventDate, daysCount - 1)
+  const totalAmount = input.total_amount ?? null
+  const entryAmount = input.entry_amount ?? null
+  const remainingAmount = input.remaining_amount ?? (totalAmount !== null && entryAmount !== null ? totalAmount - entryAmount : null)
+
+  return {
+    space_id: input.space_id || mockSpace.id,
+    customer_name: input.customer_name,
+    customer_phone: input.customer_phone,
+    customer_email: input.customer_email ?? null,
+    customer_document: input.customer_document ?? null,
+    customer_address: input.customer_address ?? null,
+    event_date: eventDate,
+    end_date: endDate,
+    days_count: daysCount,
+    daily_rate: input.daily_rate ?? null,
+    event_type: input.event_type ?? null,
+    period_start: input.period_start ?? '09:00',
+    period_end: input.period_end ?? '23:00',
+    total_amount: totalAmount,
+    entry_amount: entryAmount,
+    remaining_amount: remainingAmount,
+    cleaning_fee: input.cleaning_fee ?? 100,
+    status: input.status ?? 'interesse_enviado',
+    notes: input.notes ?? null,
+  }
+}
 
 export async function fetchReservations(): Promise<Reservation[]> {
   if (!isSupabaseConfigured || !supabase) return mockReservations
@@ -11,46 +43,24 @@ export async function fetchReservations(): Promise<Reservation[]> {
 }
 
 export async function createReservation(input: CreateReservationInput): Promise<Reservation> {
+  const payload = normalizeReservationPayload(input)
+
   if (!isSupabaseConfigured || !supabase) {
     return {
       id: `res-${Date.now()}`,
       lead_id: null,
-      customer_email: input.customer_email ?? null,
-      customer_document: null,
-      customer_address: null,
-      event_type: null,
-      period_start: '09:00',
-      period_end: '23:00',
       guests_expected: null,
-      total_amount: input.total_amount ?? null,
-      entry_amount: input.entry_amount ?? null,
-      remaining_amount: null,
-      cleaning_fee: 100,
       entry_due_at: null,
       expires_at: null,
-      status: input.status ?? 'interesse_enviado',
       public_link_token: `demo-token-${Date.now()}`,
-      notes: input.notes ?? null,
       image_use_authorized: true,
       venue_address_snapshot: 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia - GO',
       capacity_snapshot: 100,
       created_by: 'demo-admin',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      ...input,
+      ...payload,
     }
-  }
-
-  const payload = {
-    space_id: input.space_id || mockSpace.id,
-    customer_name: input.customer_name,
-    customer_phone: input.customer_phone,
-    customer_email: input.customer_email ?? null,
-    event_date: input.event_date,
-    total_amount: input.total_amount ?? null,
-    entry_amount: input.entry_amount ?? null,
-    status: input.status ?? 'interesse_enviado',
-    notes: input.notes ?? null,
   }
 
   const { data, error } = await supabase.from('reservations').insert(payload).select('*').single()
@@ -60,14 +70,49 @@ export async function createReservation(input: CreateReservationInput): Promise<
 
 export async function updateReservation(id: string, updates: Partial<Reservation>): Promise<Reservation> {
   if (!isSupabaseConfigured || !supabase) {
-    const reservation = mockReservations.find(r => r.id === id)
+    const reservation = mockReservations.find((item) => item.id === id)
     if (!reservation) throw new Error('Reservation not found')
     return { ...reservation, ...updates, updated_at: new Date().toISOString() }
   }
 
+  const normalizedUpdates = { ...updates }
+  if (normalizedUpdates.event_date || normalizedUpdates.end_date || normalizedUpdates.days_count !== undefined) {
+    const eventDate = normalizedUpdates.event_date ?? null
+    const endDate = normalizedUpdates.end_date ?? null
+
+    if (eventDate) {
+      const daysCount = Math.max(
+        Number(normalizedUpdates.days_count ?? differenceInDaysInclusive(eventDate, endDate)),
+        1,
+      )
+      normalizedUpdates.days_count = daysCount
+      normalizedUpdates.end_date = endDate ?? addDaysToDateString(eventDate, daysCount - 1)
+    }
+  }
+
+  if (
+    normalizedUpdates.total_amount !== undefined ||
+    normalizedUpdates.entry_amount !== undefined ||
+    normalizedUpdates.daily_rate !== undefined ||
+    normalizedUpdates.days_count !== undefined
+  ) {
+    if (
+      normalizedUpdates.total_amount === undefined &&
+      normalizedUpdates.daily_rate !== undefined &&
+      normalizedUpdates.days_count !== undefined
+    ) {
+      normalizedUpdates.total_amount = Number(normalizedUpdates.daily_rate ?? 0) * Number(normalizedUpdates.days_count ?? 1)
+    }
+    const total = normalizedUpdates.total_amount ?? null
+    const entry = normalizedUpdates.entry_amount ?? null
+    if (normalizedUpdates.remaining_amount === undefined && total !== null && entry !== null) {
+      normalizedUpdates.remaining_amount = total - entry
+    }
+  }
+
   const { data, error } = await supabase
     .from('reservations')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update({ ...normalizedUpdates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .select('*')
     .single()

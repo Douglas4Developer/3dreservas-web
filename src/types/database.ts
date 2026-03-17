@@ -59,6 +59,9 @@ export interface Reservation {
   customer_document: string | null
   customer_address: string | null
   event_date: string
+  end_date: string | null
+  days_count: number | null
+  daily_rate: number | null
   event_type: string | null
   period_start: string
   period_end: string
@@ -75,6 +78,22 @@ export interface Reservation {
   image_use_authorized: boolean | null
   venue_address_snapshot: string | null
   capacity_snapshot: number | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ReservationAddendum {
+  id: string
+  reservation_id: string
+  contract_id: string | null
+  addendum_number: number
+  previous_end_date: string
+  new_end_date: string
+  extra_days: number
+  amount_per_day: number | null
+  extra_amount: number
+  notes: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -207,6 +226,7 @@ export interface ReservationLookup {
   activePaymentOrder: PaymentOrder | null
   contract: Contract | null
   signatures: Signature[]
+  addendums: ReservationAddendum[]
 }
 
 export interface DashboardSummary {
@@ -238,12 +258,30 @@ export interface CreateReservationInput {
   customer_name: string
   customer_phone: string
   customer_email?: string
+  customer_document?: string
+  customer_address?: string
   event_date: string
+  end_date?: string
+  days_count?: number
+  daily_rate?: number
+  event_type?: string
+  period_start?: string
+  period_end?: string
   total_amount?: number
   entry_amount?: number
+  remaining_amount?: number
+  cleaning_fee?: number
   status?: ReservationStatus
   notes?: string
   space_id: string
+}
+
+export interface CreateReservationAddendumInput {
+  reservationId: string
+  extraDays: number
+  amountPerDay?: number
+  extraAmount?: number
+  notes?: string
 }
 
 export interface CreatePaymentOrderInput {
@@ -258,6 +296,7 @@ export interface CreateSignatureInput {
   token: string
   signer_name: string
   signer_document?: string
+  signature_data_url?: string
 }
 
 export interface UpsertSpaceMediaInput {
