@@ -29,7 +29,7 @@ export default function SpacePage() {
         <div className="page-header">
           <div>
             <h1>Conheça o 3Deventos</h1>
-            <p>Uma página comercial dedicada ao espaço ajuda o cliente a decidir antes mesmo do primeiro contato.</p>
+            <p>Um espaço preparado para receber seu evento com conforto, estrutura e um visual que encanta já no primeiro olhar.</p>
           </div>
           <Link className="button" to="/disponibilidade">
             Consultar disponibilidade
@@ -42,10 +42,9 @@ export default function SpacePage() {
           <div className="page-grid page-grid--public">
             <article className="card details-card">
               {heroImage?.external_url ? <img src={heroImage.external_url} alt={heroImage.title} className="hero-banner-image" /> : null}
-              <h2>Estrutura completa para receber eventos</h2>
+              <h2>Estrutura completa para momentos especiais</h2>
               <p>
-                O objetivo dessa página é mostrar o espaço de forma comercial e clara: o que está incluído,
-                como funciona a locação e por que o cliente deve avançar para a proposta.
+                Ideal para aniversários, encontros, confraternizações e celebrações em família, com áreas de apoio que tornam a experiência mais prática para você e seus convidados.
               </p>
               <div className="amenities-grid">
                 {amenities.map((item) => (
@@ -57,16 +56,16 @@ export default function SpacePage() {
             </article>
 
             <aside className="card details-card">
-              <h2>Informações rápidas</h2>
+              <h2>Por que esse espaço chama atenção</h2>
               <ul className="check-list">
-                <li>Calendário online com datas livres e indisponíveis</li>
-                <li>Negociação com proposta e bloqueio temporário</li>
-                <li>Pagamento da entrada por link seguro</li>
-                <li>Contrato liberado somente após pagamento</li>
-                <li>Consulta da reserva e do contrato por link individual</li>
+                <li>Ambiente pronto para receber bem e impressionar nas fotos</li>
+                <li>Estrutura confortável para eventos de um dia ou mais</li>
+                <li>Consulta de datas online para facilitar sua escolha</li>
+                <li>Atendimento rápido para tirar dúvidas e alinhar detalhes</li>
+                <li>Reserva organizada para dar mais segurança na confirmação</li>
               </ul>
-              <Link className="button" to="/como-funciona">
-                Ver como funciona a reserva
+              <Link className="button" to="/galeria">
+                Ver mais fotos
               </Link>
             </aside>
           </div>

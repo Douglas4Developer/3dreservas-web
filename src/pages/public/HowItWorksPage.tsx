@@ -1,19 +1,19 @@
 const steps = [
   {
-    title: '1. Cliente consulta datas',
-    body: 'O site mostra a agenda em tempo real e já deixa claro quando uma data está livre, bloqueada ou reservada.',
+    title: '1. Consulte a agenda',
+    body: 'Veja online quais datas combinam com o seu evento e avance com mais segurança na escolha.',
   },
   {
-    title: '2. Interesse e proposta',
-    body: 'Depois do interesse, o administrador avalia e gera a proposta com valor da entrada e prazo de pagamento.',
+    title: '2. Fale com a gente',
+    body: 'Envie seus dados para alinhar detalhes, valores, regras de uso e o formato ideal da sua locação.',
   },
   {
-    title: '3. Pagamento da entrada',
-    body: 'Enquanto o link de pagamento estiver válido, a data fica bloqueada. Pagamento aprovado confirma a reserva.',
+    title: '3. Confirme a data',
+    body: 'Depois da aprovação, a reserva segue para confirmação e organização da entrada.',
   },
   {
-    title: '4. Contrato e assinatura',
-    body: 'O contrato é gerado automaticamente, liberado para o cliente e depois para o administrador assinar.',
+    title: '4. Evento com mais tranquilidade',
+    body: 'Tudo fica mais claro para você aproveitar seu momento sabendo que a data foi bem organizada.',
   },
 ]
 
@@ -23,8 +23,8 @@ export default function HowItWorksPage() {
       <div className="container stack-lg">
         <div className="page-header">
           <div>
-            <h1>Como funciona o processo de reserva</h1>
-            <p>Esta página explica o fluxo comercial e ajuda a reduzir dúvidas antes do fechamento.</p>
+            <h1>Como reservar seu evento</h1>
+            <p>Um processo simples e direto para você escolher a data e avançar com mais confiança.</p>
           </div>
         </div>
 

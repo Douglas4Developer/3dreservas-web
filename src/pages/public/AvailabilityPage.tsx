@@ -65,7 +65,7 @@ export default function AvailabilityPage() {
 
     try {
       if (!form.desired_date) {
-        throw new Error('Selecione uma data antes de enviar o interesse.')
+        throw new Error('Selecione uma data antes de enviar sua solicitação.')
       }
 
       await createLead({
@@ -77,7 +77,7 @@ export default function AvailabilityPage() {
         space_id: spaceId,
       })
 
-      setFeedback('Interesse enviado com sucesso. Em seguida você pode receber proposta, link de pagamento e contrato.')
+      setFeedback('Solicitação enviada com sucesso. Vamos analisar a data e retornar para você o quanto antes.')
       setForm({
         customer_name: '',
         customer_phone: '',
@@ -86,7 +86,7 @@ export default function AvailabilityPage() {
         message: '',
       })
     } catch (serviceError) {
-      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao enviar interesse.')
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao enviar solicitação.')
     } finally {
       setSubmitting(false)
     }
@@ -96,6 +96,13 @@ export default function AvailabilityPage() {
     <section className="section-block">
       <div className="container page-grid page-grid--public">
         <div>
+          <div className="page-header" style={{ marginBottom: 16 }}>
+            <div>
+              <h1>Consulte a disponibilidade</h1>
+              <p>Escolha a data desejada no calendário e envie sua solicitação para atendimento.</p>
+            </div>
+          </div>
+
           {loading ? (
             <LoadingState label="Carregando disponibilidade..." />
           ) : (
@@ -126,8 +133,8 @@ export default function AvailabilityPage() {
         </div>
 
         <aside className="card form-card">
-          <h2>Demonstrar interesse</h2>
-          <p>Selecione uma data no calendário e envie seus dados para iniciar a negociação.</p>
+          <h2>Pedir atendimento</h2>
+          <p>Preencha seus dados para receber retorno sobre a data, condições e próximos passos da reserva.</p>
 
           <form className="form-grid" onSubmit={handleSubmit}>
             <label>
@@ -147,7 +154,7 @@ export default function AvailabilityPage() {
               <input type="date" value={form.desired_date} onChange={(event) => handleChange('desired_date', event.target.value)} required />
             </label>
             <label>
-              Observações
+              Conte mais sobre o evento
               <textarea rows={4} value={form.message} onChange={(event) => handleChange('message', event.target.value)} />
             </label>
 
@@ -155,7 +162,7 @@ export default function AvailabilityPage() {
             {error ? <div className="alert alert-error">{error}</div> : null}
 
             <button className="button" type="submit" disabled={submitting}>
-              {submitting ? 'Enviando...' : 'Enviar interesse'}
+              {submitting ? 'Enviando...' : 'Enviar solicitação'}
             </button>
           </form>
         </aside>

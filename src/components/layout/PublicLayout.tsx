@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { isSupabaseConfigured } from '../../lib/supabase'
 
@@ -7,7 +7,7 @@ const navigation = [
   { to: '/espaco', label: 'O espaço' },
   { to: '/galeria', label: 'Galeria' },
   { to: '/disponibilidade', label: 'Disponibilidade' },
-  { to: '/como-funciona', label: 'Como funciona' },
+  { to: '/como-funciona', label: 'Como reservar' },
   { to: '/admin', label: 'Painel' },
 ]
 
@@ -16,11 +16,18 @@ export default function PublicLayout() {
 
   const whatsappUrl = 'https://api.whatsapp.com/send/?phone=556284876724&text&type=phone_number&app_absent=0'
 
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [menuOpen])
+
   return (
     <div className="public-shell">
       <header className="public-header">
         <div className="container public-header__inner public-header__inner--responsive">
-          <Link to="/" className="brand-mark">
+          <Link to="/" className="brand-mark" onClick={() => setMenuOpen(false)}>
             <img src="/logopng.png" alt="3DReservas" style={{ height: '50px' }} />
           </Link>
 
@@ -34,8 +41,9 @@ export default function PublicLayout() {
 
           <button
             type="button"
-            className="nav-toggle"
+            className={`nav-toggle ${menuOpen ? 'nav-toggle--active' : ''}`}
             aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'}
+            aria-expanded={menuOpen}
             onClick={() => setMenuOpen((value) => !value)}
           >
             <span />
@@ -48,21 +56,37 @@ export default function PublicLayout() {
           <button className="public-mobile-menu__backdrop" type="button" onClick={() => setMenuOpen(false)} aria-label="Fechar menu" />
           <div className="public-mobile-menu__panel">
             <div className="public-mobile-menu__header">
-              <img src="/logopng.png" alt="3DReservas" style={{ height: '50px' }} />
-              <button type="button" className="nav-toggle nav-toggle--active" onClick={() => setMenuOpen(false)} aria-label="Fechar menu">
-                <span />
-                <span />
-                <span />
+              <div>
+                <strong>Menu</strong>
+                <p>Escolha a próxima etapa para conhecer e reservar o espaço.</p>
+              </div>
+              <button
+                type="button"
+                className="public-mobile-menu__close"
+                onClick={() => setMenuOpen(false)}
+                aria-label="Fechar menu"
+              >
+                ✕
               </button>
             </div>
 
             <nav className="public-mobile-menu__nav">
               {navigation.map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={() => setMenuOpen(false)}>
-                  {item.label}
+                  <span>{item.label}</span>
+                  <small>→</small>
                 </NavLink>
               ))}
             </nav>
+
+            <div className="public-mobile-menu__actions">
+              <Link className="button" to="/disponibilidade" onClick={() => setMenuOpen(false)}>
+                Ver datas disponíveis
+              </Link>
+              <a className="button button-secondary" href={whatsappUrl} target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}>
+                Falar no WhatsApp
+              </a>
+            </div>
           </div>
         </div>
       </header>
@@ -81,11 +105,11 @@ export default function PublicLayout() {
         <div className="container public-footer__inner">
           <div>
             <img src="/logopng.png" alt="3DReservas" style={{ height: '32px' }} />
-            <p>Vitrine, agenda, pagamento, contrato e acompanhamento da reserva em um só lugar.</p>
+            <p>Um espaço preparado para celebrar aniversários, encontros, confraternizações e momentos especiais com conforto.</p>
           </div>
           <div>
-            <p>3Deventos • Goiânia • Site desenvolvido por DOUGLAS S S FERREIRA. </p>
-            <p>Experiência pensada para converter consultas em reservas.</p>
+            <p>3Deventos • Goiânia • Jardim Bonanza</p>
+            <p>Consulte a disponibilidade online e fale direto no WhatsApp para fechar sua data.</p>
           </div>
         </div>
       </footer>

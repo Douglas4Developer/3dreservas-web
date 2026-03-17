@@ -685,6 +685,24 @@ textarea {
   .admin-topbar {
     padding-inline: 1rem;
   }
+
+  /* Mobile header improvements */
+  .public-nav--desktop {
+    display: none;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .public-header__inner {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .brand-mark {
+    flex: 1 1 auto;
+  }
 }
 
 @media (max-width: 760px) {
@@ -1658,35 +1676,53 @@ body {
 }
 
 .public-mobile-menu {
-  position: fixed;
-  inset: 0;
-  z-index: 25;
-  pointer-events: none;
+  display: none;
 }
 
-.public-mobile-menu__backdrop {
-  position: absolute;
-  inset: 0;
-  border: none;
-  background: rgba(15, 23, 42, 0.4);
-  opacity: 0;
-  transition: opacity 0.25s ease;
-}
+@media (max-width: 920px) {
+  .public-mobile-menu {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    pointer-events: none;
+  }
 
-.public-mobile-menu__panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: min(320px, 88vw);
-  height: 100%;
-  padding: 1rem;
-  display: grid;
-  align-content: start;
-  gap: 1rem;
-  background: rgba(255, 255, 255, 0.98);
-  transform: translateX(100%);
-  transition: transform 0.25s ease;
-  box-shadow: var(--shadow-heavy);
+  .public-mobile-menu__backdrop {
+    position: absolute;
+    inset: 0;
+    border: none;
+    background: rgba(15, 23, 42, 0.4);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .public-mobile-menu__panel {
+    position: fixed;
+    top: 50%;
+    right: 10%;
+    width: min(340px, 90vw);
+    max-height: 80vh;
+    padding: 1rem;
+    display: grid;
+    align-content: start;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.98);
+    transform: translate(110%, -50%);
+    transition: transform 0.25s ease;
+    box-shadow: var(--shadow-heavy);
+    border-radius: 18px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .public-mobile-menu--open .public-mobile-menu__panel {
+    transform: translate(0, -50%);
+  }
+
+  .public-mobile-menu--open ~ .public-shell {
+    overflow: hidden;
+  }
 }
 
 .public-mobile-menu--open {
@@ -1992,6 +2028,50 @@ body {
     justify-content: center;
   }
 
+  .public-mobile-menu {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    pointer-events: none;
+  }
+
+  .public-mobile-menu__backdrop {
+    position: absolute;
+    inset: 0;
+    border: none;
+    background: rgba(15, 23, 42, 0.4);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .public-mobile-menu__panel {
+    position: fixed;
+    top: 50%;
+    right: 10%;
+    width: min(340px, 90vw);
+    max-height: 80vh;
+    padding: 1rem;
+    display: grid;
+    align-content: start;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.98);
+    transform: translate(110%, -50%);
+    transition: transform 0.25s ease;
+    box-shadow: var(--shadow-heavy);
+    border-radius: 18px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .public-mobile-menu--open .public-mobile-menu__panel {
+    transform: translate(0, -50%);
+  }
+
+  .public-mobile-menu--open ~ .public-shell {
+    overflow: hidden;
+  }
+
   .floating-cta-bar {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2149,5 +2229,268 @@ body {
   .lightbox__nav {
     width: 44px;
     height: 44px;
+  }
+}
+
+
+.nav-toggle--active {
+  background: rgba(21, 101, 216, 0.12);
+}
+
+.nav-toggle--active span {
+  background: var(--primary);
+}
+
+.public-mobile-menu__close {
+  border: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(21, 101, 216, 0.08);
+  color: var(--primary);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.public-mobile-menu__header p {
+  margin: 0.3rem 0 0;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+.public-mobile-menu__actions {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.line-card--elevated {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1rem 1.05rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.9));
+}
+
+.dashboard-line-meta {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: end;
+}
+
+.dashboard-line-meta small {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.dashboard-airbnb-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+  gap: 1rem;
+}
+
+.dashboard-airbnb-grid--two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-spotlight,
+.dashboard-side-metrics,
+.dashboard-panel-card {
+  border-radius: 28px;
+  box-shadow: var(--shadow-soft);
+}
+
+.dashboard-spotlight {
+  background: linear-gradient(135deg, rgba(17, 24, 39, 0.98), rgba(35, 91, 188, 0.95));
+  color: #fff;
+}
+
+.dashboard-spotlight h3,
+.dashboard-panel-card h3 {
+  margin: 0.35rem 0 0;
+  font-size: 1.3rem;
+}
+
+.dashboard-kicker {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.dashboard-spotlight .dashboard-kicker {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dashboard-spotlight__header,
+.dashboard-panel-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-spotlight__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.occupancy-bars {
+  display: grid;
+  gap: 1rem;
+}
+
+.occupancy-bars__item {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.occupancy-bars__top,
+.occupancy-bars__meta,
+.status-distribution__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.occupancy-bars__top span,
+.occupancy-bars__meta span,
+.occupancy-bars__meta strong {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.occupancy-bars__track,
+.status-distribution__track {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.occupancy-bars__fill,
+.status-distribution__fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.occupancy-bars__fill {
+  background: linear-gradient(90deg, #93c5fd, #ffffff);
+}
+
+.dashboard-side-metrics__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-mini-card {
+  display: grid;
+  gap: 0.4rem;
+  padding: 1.15rem;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.92));
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.dashboard-mini-card span,
+.dashboard-mini-card small,
+.status-distribution__label span {
+  color: var(--text-soft);
+}
+
+.dashboard-mini-card strong {
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.status-distribution {
+  display: grid;
+  gap: 1rem;
+}
+
+.status-distribution__row {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.status-distribution__fill--reservado {
+  background: linear-gradient(90deg, #16a34a, #4ade80);
+}
+
+.status-distribution__fill--aguardando_pagamento {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+
+.status-distribution__fill--bloqueio_temporario {
+  background: linear-gradient(90deg, #b45309, #fbbf24);
+}
+
+.status-distribution__fill--interesse_enviado {
+  background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.status-distribution__fill--cancelado {
+  background: linear-gradient(90deg, #64748b, #94a3b8);
+}
+
+@media (max-width: 920px) {
+  .public-mobile-menu__panel {
+    top: 76px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-height: calc(100vh - 96px);
+    padding: 1rem;
+    border-radius: 24px;
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+
+  .public-mobile-menu--open .public-mobile-menu__panel {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .public-mobile-menu__nav a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.05rem;
+  }
+
+  .public-mobile-menu__nav a small {
+    color: var(--primary);
+    font-size: 1rem;
+    font-weight: 900;
+  }
+
+  .dashboard-airbnb-grid,
+  .dashboard-airbnb-grid--two-columns,
+  .dashboard-side-metrics__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-spotlight__header,
+  .dashboard-panel-card__header,
+  .status-distribution__label,
+  .occupancy-bars__top,
+  .occupancy-bars__meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-line-meta {
+    justify-items: start;
   }
 }

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ImageLightbox, type LightboxItem } from '../../components/ui/ImageLightbox'
@@ -8,42 +9,42 @@ import { fetchPublicMedia } from '../../services/media.service'
 import type { CalendarDay, SpaceMedia } from '../../types/database'
 import './HomePage.css'
 
-const trustItems = ['Jardim Bonanza • Goiânia', 'Contrato digital', 'Pagamento de entrada', 'Atendimento rápido']
+const trustItems = ['Jardim Bonanza • Goiânia', 'Piscina coberta e aquecida', 'Atendimento rápido', 'Reserva com segurança']
 
 const highlights = [
-  'Piscina coberta e aquecida',
   'Área gourmet com churrasqueira',
   'Quartos, colchonetes e apoio completo',
-  'Reserva com proposta, entrada e contrato',
+  'Som ambiente e Wi‑Fi disponíveis',
+  'Ideal para aniversários, encontros e confraternizações',
 ]
 
 const essentials = [
   {
-    title: 'Estrutura que vende o espaço rápido',
-    description: 'Piscina coberta, área gourmet, cozinha de apoio, quartos e ambiente preparado para eventos.',
+    title: 'Escolha um espaço que impressiona',
+    description: 'Ambiente bonito, confortável e pronto para receber seus convidados com mais praticidade.',
   },
   {
-    title: 'Fotos reais do seu banco',
-    description: 'A capa e a galeria continuam buscando suas imagens publicadas no banco, sem trocar por placeholders fixos.',
+    title: 'Veja fotos reais antes de decidir',
+    description: 'A vitrine continua puxando as imagens reais do seu banco para o cliente enxergar o espaço como ele é.',
   },
   {
-    title: 'Fluxo simples para reservar',
-    description: 'O visitante entende o espaço, consulta a agenda e avança para o próximo passo sem excesso de informação.',
+    title: 'Consulte a data sem complicação',
+    description: 'O visitante entende rápido se a data está livre e já consegue seguir para atendimento.',
   },
 ]
 
 const bookingSteps = [
   {
-    title: 'Veja a disponibilidade',
-    description: 'O cliente acessa a agenda e entende rápido quais datas fazem sentido para o evento.',
+    title: 'Escolha a melhor data',
+    description: 'Veja a agenda online e filtre rapidamente o que funciona melhor para o seu evento.',
   },
   {
-    title: 'Fale e receba a proposta',
-    description: 'A conversa continua pelo canal de atendimento com regras, valores e confirmação da entrada.',
+    title: 'Peça seu atendimento',
+    description: 'Envie seus dados e receba retorno para alinhar detalhes, valores e condições.',
   },
   {
-    title: 'Feche com segurança',
-    description: 'Depois da confirmação, o contrato segue de forma organizada e profissional.',
+    title: 'Confirme com tranquilidade',
+    description: 'Depois da aprovação, sua reserva segue com organização, entrada e contrato.',
   },
 ]
 
@@ -73,25 +74,12 @@ export default function HomePage() {
       setLoading(true)
       const boundaries = getMonthBoundaries(new Date())
 
-      const [mediaResult, calendarResult] = await Promise.allSettled([
-        fetchPublicMedia(),
-        getPublicCalendar(boundaries),
-      ])
+      const [mediaResult, calendarResult] = await Promise.allSettled([fetchPublicMedia(), getPublicCalendar(boundaries)])
 
       if (ignore) return
 
-      if (mediaResult.status === 'fulfilled') {
-        setMedia(mediaResult.value)
-      } else {
-        setMedia([])
-      }
-
-      if (calendarResult.status === 'fulfilled') {
-        setCalendarEntries(calendarResult.value)
-      } else {
-        setCalendarEntries([])
-      }
-
+      setMedia(mediaResult.status === 'fulfilled' ? mediaResult.value : [])
+      setCalendarEntries(calendarResult.status === 'fulfilled' ? calendarResult.value : [])
       setLoading(false)
     }
 
@@ -125,11 +113,9 @@ export default function HomePage() {
 
   useEffect(() => {
     if (heroImages.length <= 1) return
-
     const intervalId = window.setInterval(() => {
       setActiveHeroIndex((current) => (current + 1) % heroImages.length)
     }, 4500)
-
     return () => window.clearInterval(intervalId)
   }, [heroImages.length])
 
@@ -143,9 +129,7 @@ export default function HomePage() {
 
   const nextAvailableDates = useMemo(() => {
     const blockedStatuses = new Set(['bloqueio_temporario', 'aguardando_pagamento', 'reservado'])
-    const blockedDates = new Set(
-      calendarEntries.filter((item) => blockedStatuses.has(item.status)).map((item) => item.event_date),
-    )
+    const blockedDates = new Set(calendarEntries.filter((item) => blockedStatuses.has(item.status)).map((item) => item.event_date))
 
     const suggestedDates: string[] = []
     const today = new Date()
@@ -183,11 +167,11 @@ export default function HomePage() {
 
             <span className="hl-eyebrow">Espaço de eventos 3Deventos</span>
 
-            <h1 className="hl-title">Seu espaço apresentado de forma moderna, direta e com foco em reserva.</h1>
+            <h1 className="hl-title">O lugar certo para viver seu evento com conforto, beleza e praticidade.</h1>
 
             <p className="hl-subtitle">
-              Menos blocos, menos distração e mais clareza: fotos reais do espaço, benefício visível e caminho simples
-              para o cliente consultar disponibilidade.
+              Um espaço pensado para aniversários, confraternizações, encontros em família e momentos especiais,
+              com estrutura completa e um caminho simples para consultar disponibilidade.
             </p>
 
             <div className="hl-actions">
@@ -262,8 +246,8 @@ export default function HomePage() {
         <div className="hl-shell">
           <div className="hl-section__header hl-section__header--compact">
             <div>
-              <span className="hl-eyebrow">O essencial</span>
-              <h2>Uma página mais limpa, profissional e intuitiva</h2>
+              <span className="hl-eyebrow">Por que escolher</span>
+              <h2>Uma apresentação comercial que ajuda o cliente a decidir mais rápido</h2>
             </div>
           </div>
 
@@ -281,27 +265,23 @@ export default function HomePage() {
       <section className="hl-section hl-section--soft">
         <div className="hl-shell hl-availability">
           <div>
-            <span className="hl-eyebrow">Disponibilidade rápida</span>
-            <h2>Leve o cliente para a agenda sem sobrecarregar a tela inicial</h2>
+            <span className="hl-eyebrow">Disponibilidade</span>
+            <h2>Consulte datas antes mesmo do primeiro contato</h2>
             <p>
-              Em vez de muitos números e quadros, mostre apenas uma chamada clara para a consulta e algumas datas
-              sugeridas para acelerar a decisão.
+              Ver a disponibilidade online transmite confiança e acelera a decisão. O cliente enxerga o cenário e já
+              avança com muito mais clareza.
             </p>
           </div>
 
-          <div className="hl-availability__panel">
+          <article className="hl-availability__panel">
             <strong>Próximas datas sugeridas</strong>
             <div className="hl-date-list">
-              {nextAvailableDates.length > 0 ? (
-                nextAvailableDates.map((date) => <span key={date}>{formatShortDate(date)}</span>)
-              ) : (
-                <span>Consulte a agenda completa</span>
-              )}
+              {nextAvailableDates.length > 0 ? nextAvailableDates.map((date) => <span key={date}>{formatShortDate(date)}</span>) : <span>Consulte o calendário</span>}
             </div>
-            <Link className="hl-btn hl-btn--primary hl-btn--full" to="/disponibilidade">
-              Consultar agenda completa
+            <Link to="/disponibilidade" className="hl-inline-link">
+              Abrir calendário completo
             </Link>
-          </div>
+          </article>
         </div>
       </section>
 
@@ -309,72 +289,65 @@ export default function HomePage() {
         <div className="hl-shell">
           <div className="hl-section__header">
             <div>
-              <span className="hl-eyebrow">Como funciona</span>
-              <h2>Um fluxo simples do interesse até a reserva</h2>
+              <span className="hl-eyebrow">Como reservar</span>
+              <h2>Uma jornada simples para sair da visita até a confirmação</h2>
             </div>
-            <Link className="hl-inline-link" to="/como-funciona">
-              Ver detalhes
-            </Link>
           </div>
 
           <div className="hl-card-grid hl-card-grid--three">
-            {bookingSteps.map((item, index) => (
-              <article key={item.title} className="hl-card hl-card--step">
+            {bookingSteps.map((step, index) => (
+              <article key={step.title} className="hl-card hl-card--step">
                 <span className="hl-step-number">0{index + 1}</span>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
+                <h3>{step.title}</h3>
+                <p>{step.description}</p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="hl-section">
+      <section className="hl-section hl-section--soft">
         <div className="hl-shell">
           <div className="hl-section__header">
             <div>
               <span className="hl-eyebrow">Galeria</span>
-              <h2>Fotos grandes e limpas, vindas direto do banco</h2>
+              <h2>Veja o espaço com fotos reais</h2>
             </div>
-            <Link className="hl-inline-link" to="/galeria">
-              Ver galeria completa
+            <Link to="/galeria" className="hl-inline-link">
+              Abrir galeria completa
             </Link>
           </div>
 
-          {loading ? (
-            <LoadingState label="Carregando galeria..." />
-          ) : galleryPreview.length === 0 ? (
-            <article className="hl-card hl-card--empty">
-              <strong>Nenhuma imagem publicada ainda.</strong>
-              <p>Publique as melhores fotos na área administrativa para preencher esta vitrine automaticamente.</p>
-            </article>
-          ) : (
+          {galleryPreview.length > 0 ? (
             <div className="hl-gallery-grid">
               {galleryPreview.map((item, index) => (
                 <article key={item.id} className={`hl-gallery-card ${index === 0 ? 'hl-gallery-card--large' : ''}`}>
                   <button type="button" className="hl-gallery-card__button" onClick={() => handleOpenLightbox(item.id)}>
-                    <img src={item.external_url ?? ''} alt={item.title} className="hl-gallery-card__image" />
-                    <span className="hl-gallery-card__overlay">
+                    <img src={item.external_url ?? ''} alt={item.title} className="hl-media-card__image" />
+                    <div className="hl-gallery-card__overlay">
                       <strong>{item.title}</strong>
-                      <span>Expandir foto</span>
-                    </span>
+                      <span>{item.description ?? 'Ambiente do espaço'}</span>
+                    </div>
                   </button>
                 </article>
               ))}
             </div>
+          ) : (
+            <article className="hl-card hl-card--empty">
+              <h3>Sua galeria aparece aqui automaticamente</h3>
+              <p>Assim que houver fotos ativas no banco, esta prévia comercial ficará ainda mais forte.</p>
+            </article>
           )}
         </div>
       </section>
 
-      <section className="hl-section hl-section--cta">
+      <section className="hl-section">
         <div className="hl-shell">
           <article className="hl-cta-card">
             <div>
-              <span className="hl-eyebrow hl-eyebrow--light">Pronto para reservar</span>
-              <h2>Uma landing page enxuta ajuda o visitante a decidir mais rápido</h2>
-              <p>
-                Esta versão mantém suas fotos reais, reduz o excesso de conteúdo e destaca apenas o que realmente ajuda a converter reserva.
-              </p>
+              <span className="hl-eyebrow hl-eyebrow--light">Pronto para reservar?</span>
+              <h2>Escolha uma data, veja as fotos e fale com a gente para fechar seu evento.</h2>
+              <p>Uma experiência mais moderna, clara e comercial para transformar visitas em reservas.</p>
             </div>
 
             <div className="hl-actions hl-actions--cta">
@@ -389,9 +362,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {lightboxIndex !== null ? (
-        <ImageLightbox items={lightboxItems} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
-      ) : null}
+      {lightboxIndex !== null ? <ImageLightbox items={lightboxItems} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} /> : null}
     </main>
   )
 }

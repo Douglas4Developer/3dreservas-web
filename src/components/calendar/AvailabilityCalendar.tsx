@@ -9,14 +9,6 @@ interface AvailabilityCalendarProps {
   onSelectDate?: (date: string) => void
 }
 
-const visibleStatuses: ReservationStatus[] = [
-  'interesse_enviado',
-  'bloqueio_temporario',
-  'aguardando_pagamento',
-  'reservado',
-  'cancelado',
-]
-
 export function AvailabilityCalendar({
   referenceDate,
   entries,
@@ -78,20 +70,19 @@ export function AvailabilityCalendar({
           }
 
           const isSelected = selectedDate === item.date
-          const isUnavailable = ['bloqueio_temporario', 'aguardando_pagamento', 'reservado'].includes(item.status ?? '')
+          const isReserved = Boolean(item.status && item.status !== 'cancelado')
+          const displayStatus = isReserved ? 'reservado' : 'disponivel'
 
           return (
             <button
               type="button"
               key={item.date}
-              className={`calendar-day ${item.status ? `calendar-day--${item.status}` : 'calendar-day--disponivel'} ${
-                isSelected ? 'calendar-day--selected' : ''
-              }`}
-              onClick={() => !isUnavailable && onSelectDate?.(item.date!)}
-              disabled={isUnavailable}
+              className={`calendar-day calendar-day--${displayStatus} ${isSelected ? 'calendar-day--selected' : ''}`}
+              onClick={() => !isReserved && onSelectDate?.(item.date!)}
+              disabled={isReserved}
             >
               <span className="calendar-day__number">{item.dayNumber}</span>
-              <span className="calendar-day__status">{item.status ? item.status.replace(/_/g, ' ') : 'disponível'}</span>
+              <span className="calendar-day__status">{isReserved ? 'Reservado' : 'Disponível'}</span>
             </button>
           )
         })}
@@ -99,11 +90,7 @@ export function AvailabilityCalendar({
 
       <div className="calendar-legend">
         <span className="legend-item legend-item--disponivel">Disponível</span>
-        {visibleStatuses.map((status) => (
-          <span key={status} className={`legend-item legend-item--${status}`}>
-            {status.replace(/_/g, ' ')}
-          </span>
-        ))}
+        <span className="legend-item legend-item--reservado">Reservado</span>
       </div>
     </div>
   )
