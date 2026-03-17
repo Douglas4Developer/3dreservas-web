@@ -1,18 +1,20 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { isSupabaseConfigured } from '../../lib/supabase'
 
 const navigation = [
-  { to: '/', label: 'Início' },
-  { to: '/espaco', label: 'O espaço' },
-  { to: '/galeria', label: 'Galeria' },
-  { to: '/disponibilidade', label: 'Disponibilidade' },
-  { to: '/como-funciona', label: 'Como reservar' },
-  { to: '/admin', label: 'Painel' },
+  { to: '/', label: 'Início', description: 'Visão geral do espaço' },
+  { to: '/espaco', label: 'O espaço', description: 'Conheça a estrutura' },
+  { to: '/galeria', label: 'Galeria', description: 'Veja fotos reais' },
+  { to: '/disponibilidade', label: 'Disponibilidade', description: 'Consulte as datas' },
+  { to: '/como-funciona', label: 'Como reservar', description: 'Entenda os próximos passos' },
+  { to: '/admin', label: 'Painel', description: 'Área administrativa' },
 ]
 
 export default function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const location = useLocation()
 
   const whatsappUrl = 'https://api.whatsapp.com/send/?phone=556284876724&text&type=phone_number&app_absent=0'
 
@@ -22,6 +24,10 @@ export default function PublicLayout() {
       document.body.style.overflow = ''
     }
   }, [menuOpen])
+
+  useEffect(() => {
+    setMenuOpen(false)
+  }, [location.pathname])
 
   return (
     <div className="public-shell">
@@ -58,7 +64,7 @@ export default function PublicLayout() {
             <div className="public-mobile-menu__header">
               <div>
                 <strong>Menu</strong>
-                <p>Escolha a próxima etapa para conhecer e reservar o espaço.</p>
+                <p>Escolha uma opção para conhecer o espaço e avançar para a sua reserva.</p>
               </div>
               <button
                 type="button"
@@ -73,8 +79,11 @@ export default function PublicLayout() {
             <nav className="public-mobile-menu__nav">
               {navigation.map((item) => (
                 <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={() => setMenuOpen(false)}>
-                  <span>{item.label}</span>
-                  <small>→</small>
+                  <span className="public-mobile-menu__nav-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.description}</small>
+                  </span>
+                  <span className="public-mobile-menu__nav-arrow" aria-hidden="true">→</span>
                 </NavLink>
               ))}
             </nav>
@@ -114,7 +123,7 @@ export default function PublicLayout() {
         </div>
       </footer>
 
-      <div className="floating-cta-bar" aria-label="Ações rápidas do site">
+      <div className={`floating-cta-bar ${menuOpen ? 'floating-cta-bar--hidden' : ''}`} aria-label="Ações rápidas do site">
         <Link className="button" to="/disponibilidade">
           Consultar disponibilidade
         </Link>
