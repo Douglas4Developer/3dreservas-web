@@ -41,6 +41,7 @@ export async function registerPublicSignature(input: CreateSignatureInput) {
 
   return invokeEdgeFunction<{ signature: Signature }>('register-signature', {
     body: input,
+    requiresAuth: false,
   })
 }
 

@@ -1,5 +1,9 @@
 import { createClient, type FunctionInvokeOptions, type Session, type SupabaseClient } from '@supabase/supabase-js'
 
+type EdgeFunctionOptions = FunctionInvokeOptions & {
+  requiresAuth?: boolean
+}
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 export const appUrl = import.meta.env.VITE_APP_URL || window.location.origin
@@ -115,15 +119,19 @@ async function parseFunctionResponse(response: Response) {
 
 async function performEdgeFunctionRequest<TResponse = unknown>(
   functionName: string,
-  options: FunctionInvokeOptions | undefined,
-  session: Session,
+  options: EdgeFunctionOptions | undefined,
+  session: Session | null,
 ): Promise<TResponse> {
   const url = buildFunctionUrl(functionName)
   const headers = normalizeHeaders(options?.headers)
   const body = buildRequestBody(options?.body)
 
   headers.set('apikey', supabaseAnonKey ?? '')
-  headers.set('Authorization', `Bearer ${session.access_token}`)
+  if (session?.access_token) {
+    headers.set('Authorization', `Bearer ${session.access_token}`)
+  } else {
+    headers.delete('Authorization')
+  }
 
   if (!(body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -156,16 +164,21 @@ async function performEdgeFunctionRequest<TResponse = unknown>(
 
 export async function invokeEdgeFunction<TResponse = unknown>(
   functionName: string,
-  options?: FunctionInvokeOptions,
+  options?: EdgeFunctionOptions,
 ): Promise<TResponse> {
   if (!isSupabaseConfigured || !supabase) {
     throw new Error('Supabase não configurado para invocar Edge Functions.')
   }
 
-  let session = await getValidSession()
+  const requiresAuth = options?.requiresAuth !== false
+  let session: Session | null = null
 
-  if (!session?.access_token) {
-    throw new Error('Sua sessão expirou. Entre novamente no admin e tente outra vez.')
+  if (requiresAuth) {
+    session = await getValidSession()
+
+    if (!session?.access_token) {
+      throw new Error('Sua sessão expirou. Entre novamente no admin e tente outra vez.')
+    }
   }
 
   try {
@@ -174,7 +187,7 @@ export async function invokeEdgeFunction<TResponse = unknown>(
     const firstMessage = typeof (firstError as Error)?.message === 'string' ? (firstError as Error).message : ''
     const firstStatus = (firstError as Error & { status?: number })?.status
 
-    if (firstStatus !== 401 && !isJwtErrorMessage(firstMessage)) {
+    if (!requiresAuth || (firstStatus !== 401 && !isJwtErrorMessage(firstMessage))) {
       throw firstError
     }
 
