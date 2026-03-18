@@ -5,9 +5,11 @@ import {
   buildContractHtml,
   corsHeaders,
   ensureSecureLink,
+  generateContractPdfBytes,
   jsonResponse,
   queueOrSendWhatsapp,
   requireAuthenticatedUser,
+  uploadContractPdf,
 } from '../_shared/index.ts'
 
 serve(async (req: Request) => {
@@ -23,7 +25,7 @@ serve(async (req: Request) => {
     const paymentMethodLabel = body.paymentMethodLabel ?? 'pix_manual'
     const confirmationNotes = body.confirmationNotes ?? null
 
-    if (!reservationId || !amount || Number.isNaN(amount)) {
+    if (!reservationId || !amount || Number.isNaN(amount) || amount <= 0) {
       return jsonResponse({ error: 'reservationId e amount são obrigatórios.' }, 400)
     }
 
@@ -37,13 +39,15 @@ serve(async (req: Request) => {
       return jsonResponse({ error: 'Reserva não encontrada.' }, 404)
     }
 
+    const now = new Date().toISOString()
+
     await adminClient
       .from('payment_orders')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .update({ status: 'cancelled', updated_at: now })
       .eq('reservation_id', reservationId)
       .eq('status', 'pending')
 
-    const { data: existingPayment } = await adminClient
+    const { data: existingPayment, error: existingPaymentError } = await adminClient
       .from('payments')
       .select('*')
       .eq('reservation_id', reservationId)
@@ -51,76 +55,122 @@ serve(async (req: Request) => {
       .limit(1)
       .maybeSingle()
 
+    if (existingPaymentError) {
+      return jsonResponse({ error: existingPaymentError.message }, 400)
+    }
+
     if (existingPayment) {
-      await adminClient.from('payments').update({
-        amount,
-        status: 'pago',
-        provider: 'manual',
-        provider_reference: `manual-${Date.now()}`,
-        payment_method_label: paymentMethodLabel,
-        paid_at: new Date().toISOString(),
-        confirmed_by: auth.user?.id ?? null,
-        confirmation_notes: confirmationNotes,
-        updated_at: new Date().toISOString(),
-      }).eq('id', existingPayment.id)
+      const { error } = await adminClient
+        .from('payments')
+        .update({
+          amount,
+          status: 'pago',
+          provider: 'manual',
+          provider_reference: `manual-${Date.now()}`,
+          payment_method_label: paymentMethodLabel,
+          paid_at: now,
+          confirmed_by: auth.user?.id ?? null,
+          confirmation_notes: confirmationNotes,
+          updated_at: now,
+        })
+        .eq('id', existingPayment.id)
+
+      if (error) return jsonResponse({ error: error.message }, 400)
     } else {
-      await adminClient.from('payments').insert({
+      const { error } = await adminClient.from('payments').insert({
         reservation_id: reservationId,
         amount,
         status: 'pago',
         provider: 'manual',
         provider_reference: `manual-${Date.now()}`,
         payment_method_label: paymentMethodLabel,
-        paid_at: new Date().toISOString(),
+        paid_at: now,
         confirmed_by: auth.user?.id ?? null,
         confirmation_notes: confirmationNotes,
       })
+
+      if (error) return jsonResponse({ error: error.message }, 400)
     }
 
-    await adminClient.from('reservations').update({
-      status: 'reservado',
-      expires_at: null,
-      entry_due_at: null,
-      updated_at: new Date().toISOString(),
-    }).eq('id', reservationId)
+    const { error: reservationUpdateError } = await adminClient
+      .from('reservations')
+      .update({
+        status: 'reservado',
+        expires_at: null,
+        entry_due_at: null,
+        updated_at: now,
+      })
+      .eq('id', reservationId)
 
-    const html = buildContractHtml(reservation)
+    if (reservationUpdateError) return jsonResponse({ error: reservationUpdateError.message }, 400)
+
+    const reservationForContract = { ...reservation, status: 'reservado', expires_at: null, entry_due_at: null, updated_at: now }
+
+    const { data: existingContracts, error: existingContractsError } = await adminClient
+      .from('contracts')
+      .select('*')
+      .eq('reservation_id', reservationId)
+      .order('version', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (existingContractsError) {
+      return jsonResponse({ error: existingContractsError.message }, 400)
+    }
+
+    const existingContract = existingContracts?.[0] ?? null
+    const html = buildContractHtml(reservationForContract, existingContract)
     const documentHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html)).then((buffer) =>
       Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, '0')).join(''),
     )
 
-    const { data: existingContract } = await adminClient
-      .from('contracts')
-      .select('*')
-      .eq('reservation_id', reservationId)
-      .maybeSingle()
-
     let contract
 
     if (existingContract) {
-      const { data } = await adminClient.from('contracts').update({
+      const { data, error } = await adminClient.from('contracts').update({
         status: 'liberado_assinatura',
         html_content: html,
-        generated_at: new Date().toISOString(),
-        released_at: new Date().toISOString(),
+        generated_at: now,
+        released_at: now,
         document_hash: documentHash,
         template_key: 'default_v1',
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       }).eq('id', existingContract.id).select('*').single()
+      if (error) return jsonResponse({ error: error.message }, 400)
       contract = data
     } else {
-      const { data } = await adminClient.from('contracts').insert({
+      const { data, error } = await adminClient.from('contracts').insert({
         reservation_id: reservationId,
         version: 1,
         status: 'liberado_assinatura',
         html_content: html,
-        generated_at: new Date().toISOString(),
-        released_at: new Date().toISOString(),
+        generated_at: now,
+        released_at: now,
         document_hash: documentHash,
         template_key: 'default_v1',
       }).select('*').single()
+      if (error) return jsonResponse({ error: error.message }, 400)
       contract = data
     }
+
+    const pdfBytes = await generateContractPdfBytes({
+      contract,
+      reservation: reservationForContract,
+      signatures: [],
+    })
+    const uploadedPdf = await uploadContractPdf(contract.id, contract.version, pdfBytes)
+
+    const { data: contractWithPreview, error: fileError } = await adminClient
+      .from('contracts')
+      .update({
+        file_path: uploadedPdf.publicUrl,
+        updated_at: now,
+      })
+      .eq('id', contract.id)
+      .select('*')
+      .single()
+
+    if (fileError) return jsonResponse({ error: fileError.message }, 400)
 
     const contractViewLink = await ensureSecureLink({
       reservationId,
@@ -149,10 +199,11 @@ serve(async (req: Request) => {
 
     return jsonResponse({
       ok: true,
-      contract,
+      contract: contractWithPreview,
       statusUrl: `${appUrl}/minha-reserva/${statusLink.token}`,
       contractViewUrl: `${appUrl}/contrato/${contractViewLink.token}`,
       contractSignUrl: `${appUrl}/contrato/${contractSignLink.token}`,
+      previewUrl: uploadedPdf.publicUrl,
     })
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : 'Erro interno.' }, 500)

@@ -116,6 +116,19 @@ export interface Payment {
   updated_at: string
 }
 
+export interface ContractClause {
+  title: string
+  body: string
+}
+
+export interface ContractTermsJson {
+  logo_url?: string
+  intro_text?: string
+  contract_title?: string
+  show_default_clauses?: boolean
+  custom_clauses?: ContractClause[]
+}
+
 export interface Contract {
   id: string
   reservation_id: string
@@ -128,6 +141,11 @@ export interface Contract {
   generated_at?: string | null
   released_at?: string | null
   document_hash?: string | null
+  lessor_name?: string | null
+  lessor_document?: string | null
+  lessor_address?: string | null
+  forum_city?: string | null
+  contract_terms_json?: ContractTermsJson | null
   signed_at: string | null
   created_at: string
   updated_at: string
@@ -273,6 +291,7 @@ export interface CreateReservationInput {
   cleaning_fee?: number
   status?: ReservationStatus
   notes?: string
+  lead_id?: string
   space_id: string
 }
 

@@ -1,0 +1,31 @@
+project_id = "raucondbiadizmrkgntf"
+
+[functions.mercado-pago-webhook]
+verify_jwt = false
+
+[functions.get-reservation-links]
+verify_jwt = false
+
+[functions.delete-admin-entity]
+verify_jwt = false
+
+[functions.generate-contract]
+verify_jwt = false
+
+[functions.confirm-manual-payment]
+verify_jwt = false
+
+[functions.create-payment-order]
+verify_jwt = false
+
+[functions.create-pix-payment]
+verify_jwt = false
+
+[functions.create-reservation-addendum]
+verify_jwt = false
+
+[functions.send-whatsapp-template]
+verify_jwt = false
+
+[functions.register-signature]
+verify_jwt = false

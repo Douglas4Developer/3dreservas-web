@@ -8,6 +8,7 @@ import {
   jsonResponse,
   queueOrSendWhatsapp,
   uploadContractPdf,
+  requireAuthenticatedUser,
 } from '../_shared/index.ts'
 
 serve(async (req) => {
@@ -16,6 +17,11 @@ serve(async (req) => {
   try {
     const body = await req.json()
     const signerRole = (body.signer_role ?? 'client') as 'client' | 'admin'
+
+    if (!body.token) {
+      const auth = await requireAuthenticatedUser(req)
+      if (auth.error) return auth.error
+    }
     const signerName = body.signer_name as string
     const signerDocument = body.signer_document as string | undefined
     const signatureDataUrl = body.signature_data_url as string | undefined

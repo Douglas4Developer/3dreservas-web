@@ -39,8 +39,21 @@ interface ContractPdfReservation {
   notes?: string | null
 }
 
+interface ContractPdfClause {
+  title: string
+  body: string
+}
+
+interface ContractPdfTermsJson {
+  logo_url?: string
+  intro_text?: string
+  contract_title?: string
+  show_default_clauses?: boolean
+  custom_clauses?: ContractPdfClause[]
+}
+
 interface ContractPdfContract {
-  id: string
+  id?: string
   version?: number | null
   html_content?: string | null
   lessor_name?: string | null
@@ -49,6 +62,7 @@ interface ContractPdfContract {
   forum_city?: string | null
   document_hash?: string | null
   status?: string | null
+  contract_terms_json?: ContractPdfTermsJson | null
 }
 
 interface ContractPdfSignature {
@@ -144,7 +158,28 @@ function stripHtml(html?: string | null) {
     .trim()
 }
 
-export function buildContractHtml(reservation: ContractPdfReservation) {
+function escapeHtml(value?: string | null) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function normalizeCustomClauses(value: ContractPdfContract['contract_terms_json']) {
+  if (!value || !Array.isArray(value.custom_clauses)) return []
+
+  return value.custom_clauses
+    .filter((item) => item && typeof item.title === 'string' && typeof item.body === 'string')
+    .map((item) => ({
+      title: item.title.trim(),
+      body: item.body.trim(),
+    }))
+    .filter((item) => item.title && item.body)
+}
+
+export function buildContractHtml(reservation: ContractPdfReservation, contract?: ContractPdfContract | null) {
   const totalAmount = Number(reservation.total_amount ?? 0)
   const entryAmount = Number(reservation.entry_amount ?? 0)
   const remainingAmount = Number(reservation.remaining_amount ?? totalAmount - entryAmount)
@@ -155,62 +190,88 @@ export function buildContractHtml(reservation: ContractPdfReservation) {
     ? 'O LOCATÁRIO não autoriza o uso de imagens do evento para fins de divulgação.'
     : 'O LOCATÁRIO autoriza o uso de imagens do evento para fins de divulgação, salvo oposição expressa por escrito.'
 
+  const lessorName = contract?.lessor_name ?? 'Douglas Soares de Souza Ferreira'
+  const lessorDocument = contract?.lessor_document ?? '708.321.121-35'
+  const lessorAddress = contract?.lessor_address ?? 'Estrada 114 QD3 LT 13, Chácara São Joaquim, Goiânia – GO'
+  const forumCity = contract?.forum_city ?? 'Goiânia – GO'
+  const terms = contract?.contract_terms_json ?? null
+  const title = terms?.contract_title?.trim() || 'CONTRATO DE LOCAÇÃO DE ESPAÇO PARA EVENTOS – 3DEventos'
+  const introText = terms?.intro_text?.trim() || 'Contrato gerado automaticamente pelo 3DReservas com base no modelo operacional do 3Deventos.'
+  const logoUrl = terms?.logo_url?.trim() || ''
+  const showDefaultClauses = terms?.show_default_clauses !== false
+  const customClauses = normalizeCustomClauses(terms)
+
+  const defaultClauses = showDefaultClauses
+    ? `
+      <h2 style="margin-top: 24px;">1. Objeto</h2>
+      <p>O presente contrato tem por objeto a locação do espaço físico 3Deventos, localizado em ${reservation.venue_address_snapshot ?? 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia – GO'}, para realização de evento de natureza ${reservation.event_type ?? 'evento privado'}.</p>
+
+      <h2 style="margin-top: 24px;">2. Prazo da locação</h2>
+      <p>A locação compreenderá o período de <strong>${formatDateRangeText(reservation.event_date, reservation.end_date)}</strong>, totalizando <strong>${daysCount} ${daysCount === 1 ? 'dia' : 'dias'}</strong>, com início diário às <strong>${reservation.period_start ?? '09:00'}</strong> e término às <strong>${reservation.period_end ?? '23:00'}</strong>.</p>
+
+      <h2 style="margin-top: 24px;">3. Valores e pagamentos</h2>
+      <ul>
+        <li><strong>Valor da diária:</strong> ${formatCurrency(dailyRate)}</li>
+        <li><strong>Quantidade de diárias:</strong> ${daysCount}</li>
+        <li><strong>Valor total da locação:</strong> ${formatCurrency(totalAmount)}</li>
+        <li><strong>Entrada / reserva:</strong> ${formatCurrency(entryAmount)}</li>
+        <li><strong>Saldo restante:</strong> ${formatCurrency(remainingAmount)}</li>
+        <li><strong>Taxa de limpeza:</strong> ${formatCurrency(cleaningFee)} caso o espaço não seja devolvido nas mesmas condições de limpeza.</li>
+        <li>Em caso de atraso de pagamento, aplica-se multa de 2% e juros de mora de 1% ao mês.</li>
+        <li>Em caso de desistência por parte do LOCATÁRIO, não haverá devolução de valores já pagos, dada a retenção da data e os custos operacionais do evento.</li>
+      </ul>
+
+      <h2 style="margin-top: 24px;">4. Regras de uso do espaço</h2>
+      <ol>
+        <li>Capacidade máxima do local: <strong>${reservation.capacity_snapshot ?? 100} pessoas</strong>.</li>
+        <li>É proibido som automotivo.</li>
+        <li>O LOCATÁRIO deve respeitar os limites legais de horário e volume de som.</li>
+        <li>É proibido o uso de substâncias inflamáveis.</li>
+        <li>O espaço será entregue limpo e deve ser devolvido nas mesmas condições.</li>
+        <li>Danos ao imóvel, equipamentos ou mobiliário serão de responsabilidade do LOCATÁRIO.</li>
+      </ol>
+
+      <h2 style="margin-top: 24px;">5. Responsabilidades</h2>
+      <p>O LOCATÁRIO é responsável pelos participantes do evento, pelas informações prestadas e por qualquer infração legal ou dano decorrente do uso do espaço.</p>
+
+      <h2 style="margin-top: 24px;">6. Disposições gerais</h2>
+      <p>${imageClause}</p>
+      <p>Fica eleito o foro da comarca de ${forumCity} para dirimir quaisquer dúvidas oriundas deste contrato.</p>
+
+      <h2 style="margin-top: 24px;">7. Observações adicionais</h2>
+      <p>${reservation.notes ?? 'Sem observações adicionais.'}</p>
+    `
+    : ''
+
+  const customClausesHtml = customClauses
+    .map((clause, index) => `
+      <h2 style="margin-top: 24px;">${showDefaultClauses ? index + 8 : index + 1}. ${escapeHtml(clause.title)}</h2>
+      <p>${escapeHtml(clause.body).replace(/\n/g, '<br />')}</p>
+    `)
+    .join('')
+
   return `
   <article style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.7; max-width: 900px; margin: 0 auto; padding: 24px;">
-    <h1 style="font-size: 28px; margin-bottom: 8px;">CONTRATO DE LOCAÇÃO DE ESPAÇO PARA EVENTOS – 3DEventos</h1>
-    <p>Contrato gerado automaticamente pelo 3DReservas com base no modelo operacional do 3Deventos.</p>
+    ${logoUrl ? `<div style="display:flex; justify-content:center; margin-bottom: 20px;"><img src="${escapeHtml(logoUrl)}" alt="Logo do contrato" style="max-height: 92px; max-width: 220px; object-fit: contain;" /></div>` : ''}
+    <h1 style="font-size: 28px; margin-bottom: 8px; text-align:${logoUrl ? 'center' : 'left'};">${escapeHtml(title)}</h1>
+    <p>${escapeHtml(introText)}</p>
 
-    <p><strong>LOCADOR:</strong> Douglas Soares de Souza Ferreira, CPF nº 708.321.121-35, residente em Estrada 114 QD3 LT 13, Chácara São Joaquim, Goiânia – GO.</p>
-    <p><strong>LOCATÁRIO:</strong> ${reservation.customer_name}, CPF nº ${reservation.customer_document ?? 'não informado'}, residente em ${reservation.customer_address ?? 'endereço não informado'}, telefone ${reservation.customer_phone}, e-mail ${reservation.customer_email ?? 'não informado'}.</p>
+    <p><strong>LOCADOR:</strong> ${escapeHtml(lessorName)}, CPF/CNPJ nº ${escapeHtml(lessorDocument)}, residente em ${escapeHtml(lessorAddress)}.</p>
+    <p><strong>LOCATÁRIO:</strong> ${escapeHtml(reservation.customer_name)}, CPF nº ${escapeHtml(reservation.customer_document ?? 'não informado')}, residente em ${escapeHtml(reservation.customer_address ?? 'endereço não informado')}, telefone ${escapeHtml(reservation.customer_phone)}, e-mail ${escapeHtml(reservation.customer_email ?? 'não informado')}.</p>
 
-    <h2 style="margin-top: 24px;">1. Objeto</h2>
-    <p>O presente contrato tem por objeto a locação do espaço físico 3Deventos, localizado em ${reservation.venue_address_snapshot ?? 'Rua RB 10 QD 7 LT 10, Jardim Bonanza, Goiânia – GO'}, para realização de evento de natureza ${reservation.event_type ?? 'evento privado'}.</p>
-
-    <h2 style="margin-top: 24px;">2. Prazo da locação</h2>
-    <p>A locação compreenderá o período de <strong>${formatDateRangeText(reservation.event_date, reservation.end_date)}</strong>, totalizando <strong>${daysCount} ${daysCount === 1 ? 'dia' : 'dias'}</strong>, com início diário às <strong>${reservation.period_start ?? '09:00'}</strong> e término às <strong>${reservation.period_end ?? '23:00'}</strong>.</p>
-
-    <h2 style="margin-top: 24px;">3. Valores e pagamentos</h2>
-    <ul>
-      <li><strong>Valor da diária:</strong> ${formatCurrency(dailyRate)}</li>
-      <li><strong>Quantidade de diárias:</strong> ${daysCount}</li>
-      <li><strong>Valor total da locação:</strong> ${formatCurrency(totalAmount)}</li>
-      <li><strong>Entrada / reserva:</strong> ${formatCurrency(entryAmount)}</li>
-      <li><strong>Saldo restante:</strong> ${formatCurrency(remainingAmount)}</li>
-      <li><strong>Taxa de limpeza:</strong> ${formatCurrency(cleaningFee)} caso o espaço não seja devolvido nas mesmas condições de limpeza.</li>
-      <li>Em caso de atraso de pagamento, aplica-se multa de 2% e juros de mora de 1% ao mês.</li>
-      <li>Em caso de desistência por parte do LOCATÁRIO, não haverá devolução de valores já pagos, dada a retenção da data e os custos operacionais do evento.</li>
-    </ul>
-
-    <h2 style="margin-top: 24px;">4. Regras de uso do espaço</h2>
-    <ol>
-      <li>Capacidade máxima do local: <strong>${reservation.capacity_snapshot ?? 100} pessoas</strong>.</li>
-      <li>É proibido som automotivo.</li>
-      <li>O LOCATÁRIO deve respeitar os limites legais de horário e volume de som.</li>
-      <li>É proibido o uso de substâncias inflamáveis.</li>
-      <li>O espaço será entregue limpo e deve ser devolvido nas mesmas condições.</li>
-      <li>Danos ao imóvel, equipamentos ou mobiliário serão de responsabilidade do LOCATÁRIO.</li>
-    </ol>
-
-    <h2 style="margin-top: 24px;">5. Responsabilidades</h2>
-    <p>O LOCATÁRIO é responsável pelos participantes do evento, pelas informações prestadas e por qualquer infração legal ou dano decorrente do uso do espaço.</p>
-
-    <h2 style="margin-top: 24px;">6. Disposições gerais</h2>
-    <p>${imageClause}</p>
-    <p>Fica eleito o foro da comarca de Goiânia – GO para dirimir quaisquer dúvidas oriundas deste contrato.</p>
-
-    <h2 style="margin-top: 24px;">7. Observações adicionais</h2>
-    <p>${reservation.notes ?? 'Sem observações adicionais.'}</p>
+    ${defaultClauses}
+    ${customClausesHtml}
 
     <div style="margin-top: 48px; display: grid; gap: 32px; grid-template-columns: 1fr 1fr;">
       <div>
         <p><strong>LOCADOR</strong></p>
         <p>___________________________________</p>
-        <p>Douglas Soares de Souza Ferreira</p>
+        <p>${escapeHtml(lessorName)}</p>
       </div>
       <div>
         <p><strong>LOCATÁRIO</strong></p>
         <p>___________________________________</p>
-        <p>${reservation.customer_name}</p>
+        <p>${escapeHtml(reservation.customer_name)}</p>
       </div>
     </div>
     <p style="margin-top: 40px; color: #6b7280;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>

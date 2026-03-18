@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import {
@@ -10,14 +10,14 @@ import {
   formatDateRange,
 } from '../../lib/format'
 import { subscribeToTables } from '../../lib/realtime'
-import { fetchContracts } from '../../services/contracts.service'
+import { fetchContracts, getReservationLinks } from '../../services/contracts.service'
 import { getDefaultSpaceId } from '../../services/leads.service'
 import { createPaymentOrder, createPixPayment, fetchPaymentOrders } from '../../services/payment-orders.service'
 import { confirmManualPayment } from '../../services/payments.service'
 import { createReservationAddendum } from '../../services/reservation-addendums.service'
-import { createReservation, fetchReservations, updateReservation } from '../../services/reservations.service'
+import { createReservation, deleteReservation, fetchReservations, updateReservation } from '../../services/reservations.service'
 import { fetchSignatures } from '../../services/signatures.service'
-import type { PaymentOrder, Reservation, ReservationStatus } from '../../types/database'
+import type { PaymentOrder, PaymentOrderStatus, Reservation, ReservationStatus } from '../../types/database'
 
 const reservationStatusOptions: ReservationStatus[] = [
   'interesse_enviado',
@@ -62,7 +62,9 @@ export default function ReservationsPage() {
   const [pixPreviewOrder, setPixPreviewOrder] = useState<PaymentOrder | null>(null)
   const [copiedPixCode, setCopiedPixCode] = useState(false)
   const [lockedReservationIds, setLockedReservationIds] = useState<string[]>([])
+  const [deletingReservationId, setDeletingReservationId] = useState<string | null>(null)
   const [form, setForm] = useState(initialForm)
+  const previousPaymentOrdersRef = useRef<Record<string, PaymentOrderStatus>>({})
 
   async function loadData() {
     setLoading(true)
@@ -84,6 +86,28 @@ export default function ReservationsPage() {
           return Boolean(contract.signed_at) || signatures.length > 0
         })
         .map((contract) => contract.reservation_id)
+
+      const previousStatuses = previousPaymentOrdersRef.current
+      const nextStatuses = [...paymentOrdersData]
+        .sort((left, right) => right.created_at.localeCompare(left.created_at))
+        .reduce<Record<string, PaymentOrderStatus>>((accumulator, order) => {
+          if (!accumulator[order.reservation_id]) {
+            accumulator[order.reservation_id] = order.status
+          }
+          return accumulator
+        }, {})
+
+      const justPaidReservation = reservationsData.find((reservation) => {
+        const previousStatus = previousStatuses[reservation.id]
+        const nextStatus = nextStatuses[reservation.id]
+        return previousStatus === 'pending' && nextStatus === 'paid'
+      })
+
+      if (justPaidReservation) {
+        setSuccess(`Pagamento Pix confirmado para ${justPaidReservation.customer_name}. A reserva foi atualizada automaticamente.`)
+      }
+
+      previousPaymentOrdersRef.current = nextStatuses
 
       setReservations(reservationsData)
       setPaymentOrders(paymentOrdersData)
@@ -342,6 +366,69 @@ export default function ReservationsPage() {
     await navigator.clipboard.writeText(pixPreviewOrder.pix_copy_paste)
     setCopiedPixCode(true)
     window.setTimeout(() => setCopiedPixCode(false), 1800)
+  }
+
+
+  async function handleCopyReservationLink(reservationId: string) {
+    try {
+      const links = await getReservationLinks(reservationId)
+      await navigator.clipboard.writeText(links.statusUrl)
+      setSuccess('Link da reserva copiado.')
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao copiar link da reserva.')
+    }
+  }
+
+  async function handleCopyContractLink(reservationId: string) {
+    try {
+      const links = await getReservationLinks(reservationId)
+      if (!links.contractViewUrl) throw new Error('Gere o contrato antes de copiar esse link.')
+      await navigator.clipboard.writeText(links.contractViewUrl)
+      setSuccess('Link do contrato copiado.')
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao copiar link do contrato.')
+    }
+  }
+
+  async function handleShareReservationLink(reservationId: string) {
+    try {
+      const links = await getReservationLinks(reservationId)
+      window.open(links.reservationWhatsappUrl, '_blank', 'noopener,noreferrer')
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao compartilhar link da reserva.')
+    }
+  }
+
+  async function handleShareContractLink(reservationId: string) {
+    try {
+      const links = await getReservationLinks(reservationId)
+      if (!links.contractWhatsappUrl) throw new Error('Gere o contrato antes de enviar esse link.')
+      window.open(links.contractWhatsappUrl, '_blank', 'noopener,noreferrer')
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao compartilhar link do contrato.')
+    }
+  }
+
+  async function handleDeleteReservation(reservationId: string) {
+    const confirmed = window.confirm('Deseja realmente excluir esta reserva? Pagamentos, contratos e links vinculados também serão removidos.')
+    if (!confirmed) return
+
+    setDeletingReservationId(reservationId)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      await deleteReservation(reservationId)
+      if (editingReservation?.id === reservationId) {
+        resetForm()
+      }
+      setSuccess('Reserva excluída com sucesso.')
+      await loadData()
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao excluir reserva.')
+    } finally {
+      setDeletingReservationId(null)
+    }
   }
 
   const paymentOrdersMap = useMemo(() => {
@@ -625,8 +712,23 @@ export default function ReservationsPage() {
                           {creatingPaymentFor === `${reservation.id}-card` ? 'Gerando cartão...' : 'Gerar Cartão'}
                         </button>
                         <a className="button button-secondary" href={`/minha-reserva/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
-                          Link do cliente
+                          Abrir reserva
                         </a>
+                        <button className="button button-secondary" type="button" onClick={() => void handleCopyReservationLink(reservation.id)}>
+                          Copiar reserva
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={() => void handleShareReservationLink(reservation.id)}>
+                          Enviar reserva
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={() => void handleCopyContractLink(reservation.id)}>
+                          Copiar contrato
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={() => void handleShareContractLink(reservation.id)}>
+                          Enviar contrato
+                        </button>
+                        <button className="button button-secondary" type="button" onClick={() => void handleDeleteReservation(reservation.id)} disabled={deletingReservationId === reservation.id}>
+                          {deletingReservationId === reservation.id ? 'Excluindo...' : 'Excluir reserva'}
+                        </button>
                       </div>
                     </td>
                   </tr>

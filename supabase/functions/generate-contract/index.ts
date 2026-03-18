@@ -5,14 +5,20 @@ import {
   buildContractHtml,
   corsHeaders,
   ensureSecureLink,
+  generateContractPdfBytes,
   jsonResponse,
   queueOrSendWhatsapp,
+  requireAuthenticatedUser,
+  uploadContractPdf,
 } from '../_shared/index.ts'
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    const auth = await requireAuthenticatedUser(req)
+    if (auth.error) return auth.error
+
     const { reservationId } = await req.json()
     if (!reservationId) return jsonResponse({ error: 'reservationId é obrigatório.' }, 400)
 
@@ -24,16 +30,16 @@ serve(async (req) => {
 
     if (reservationError || !reservation) return jsonResponse({ error: 'Reserva não encontrada.' }, 404)
 
-    const html = buildContractHtml(reservation)
-    const documentHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html)).then((buffer) =>
-      Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, '0')).join(''),
-    )
-
     const { data: existing } = await adminClient
       .from('contracts')
       .select('*')
       .eq('reservation_id', reservation.id)
       .maybeSingle()
+
+    const html = buildContractHtml(reservation, existing)
+    const documentHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(html)).then((buffer) =>
+      Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, '0')).join(''),
+    )
 
     let contract
     if (existing) {
@@ -46,6 +52,7 @@ serve(async (req) => {
           released_at: reservation.status === 'reservado' ? new Date().toISOString() : null,
           document_hash: documentHash,
           template_key: 'default_v1',
+          updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
         .select('*')
@@ -71,6 +78,25 @@ serve(async (req) => {
       contract = data
     }
 
+    const pdfBytes = await generateContractPdfBytes({
+      contract,
+      reservation,
+      signatures: [],
+    })
+    const uploadedPdf = await uploadContractPdf(contract.id, contract.version, pdfBytes)
+
+    const { data: updatedContract, error: updateError } = await adminClient
+      .from('contracts')
+      .update({
+        file_path: uploadedPdf.publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', contract.id)
+      .select('*')
+      .single()
+
+    if (updateError) return jsonResponse({ error: updateError.message }, 400)
+
     const viewLink = await ensureSecureLink({
       reservationId: reservation.id,
       type: 'contract_view',
@@ -92,10 +118,10 @@ serve(async (req) => {
     }
 
     return jsonResponse({
-      contract,
+      contract: updatedContract,
       viewUrl: `${appUrl}/contrato/${viewLink.token}`,
       signUrl: `${appUrl}/contrato/${signLink.token}`,
-      previewUrl: `${appUrl}/contrato/${viewLink.token}`,
+      previewUrl: uploadedPdf.publicUrl,
     })
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : 'Erro interno.' }, 500)

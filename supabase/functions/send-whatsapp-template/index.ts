@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
-import { corsHeaders, jsonResponse, queueOrSendWhatsapp } from '../_shared/index.ts'
+import { corsHeaders, jsonResponse, queueOrSendWhatsapp, requireAuthenticatedUser } from '../_shared/index.ts'
 
 const templateMap: Record<string, (variables?: Record<string, string>) => string> = {
   interest_received: (variables) => `Olá ${variables?.customer_name ?? ''}, recebemos seu interesse no 3Deventos e vamos retornar em breve.`,
@@ -13,6 +13,9 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
+    const auth = await requireAuthenticatedUser(req)
+    if (auth.error) return auth.error
+
     const body = await req.json()
     const templateName = body.templateName as string
     const phone = body.phone as string

@@ -1,6 +1,6 @@
 import { mockLeads, mockSpace } from '../lib/mock'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import type { CreateLeadInput, Lead } from '../types/database'
+import type { CreateLeadInput, Lead, LeadStatus } from '../types/database'
 
 export async function getDefaultSpaceId(slug = '3deventos'): Promise<string> {
   if (!isSupabaseConfigured || !supabase) return mockSpace.id
@@ -38,6 +38,24 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
       ...input,
       source: 'site',
     })
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data as Lead
+}
+
+export async function updateLead(id: string, updates: Partial<Lead> & { status?: LeadStatus }): Promise<Lead> {
+  if (!isSupabaseConfigured || !supabase) {
+    const lead = mockLeads.find((item) => item.id === id)
+    if (!lead) throw new Error('Lead não encontrado.')
+    return { ...lead, ...updates, updated_at: new Date().toISOString() } as Lead
+  }
+
+  const { data, error } = await supabase
+    .from('leads')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
     .select('*')
     .single()
 

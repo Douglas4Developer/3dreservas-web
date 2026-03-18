@@ -1,6 +1,6 @@
 import { addDaysToDateString, differenceInDaysInclusive } from '../lib/format'
 import { mockLookupByToken, mockReservations, mockSpace } from '../lib/mock'
-import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { invokeEdgeFunction, isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { CreateReservationInput, Reservation, ReservationLookup } from '../types/database'
 
 function normalizeReservationPayload(input: CreateReservationInput) {
@@ -13,6 +13,7 @@ function normalizeReservationPayload(input: CreateReservationInput) {
 
   return {
     space_id: input.space_id || mockSpace.id,
+    lead_id: input.lead_id ?? null,
     customer_name: input.customer_name,
     customer_phone: input.customer_phone,
     customer_email: input.customer_email ?? null,
@@ -48,7 +49,6 @@ export async function createReservation(input: CreateReservationInput): Promise<
   if (!isSupabaseConfigured || !supabase) {
     return {
       id: `res-${Date.now()}`,
-      lead_id: null,
       guests_expected: null,
       entry_due_at: null,
       expires_at: null,
@@ -119,6 +119,19 @@ export async function updateReservation(id: string, updates: Partial<Reservation
 
   if (error) throw error
   return data as Reservation
+}
+
+export async function deleteReservation(reservationId: string) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { ok: true }
+  }
+
+  return invokeEdgeFunction<{ ok: boolean }>('delete-admin-entity', {
+    body: {
+      entity: 'reservation',
+      id: reservationId,
+    },
+  })
 }
 
 export async function fetchReservationLookupByToken(token: string): Promise<ReservationLookup | null> {

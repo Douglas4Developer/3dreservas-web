@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { describeReservationDays, formatCountdown, formatCurrency, formatDateRange, formatDateTime } from '../../lib/format'
+import { subscribeToTables } from '../../lib/realtime'
 import { fetchReservationLookupByToken } from '../../services/reservations.service'
 import type { ReservationLookup } from '../../types/database'
 
@@ -10,17 +11,119 @@ export default function ReservationLookupPage() {
   const [loading, setLoading] = useState(true)
   const [lookup, setLookup] = useState<ReservationLookup | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimeoutRef = useRef<number | null>(null)
+  const intervalRef = useRef<number | null>(null)
+
+  function showToast(message: string) {
+    setToast(message)
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current)
+    }
+    toastTimeoutRef.current = window.setTimeout(() => setToast(null), 5000)
+  }
+
+  async function loadLookup(options?: { silent?: boolean }) {
+    const silent = options?.silent ?? false
+
+    if (!silent) {
+      setLoading(true)
+    }
+
+    try {
+      const data = await fetchReservationLookupByToken(token)
+
+      setLookup((current) => {
+        if (current && data) {
+          const paymentWasPending = current.payments.some((payment) => payment.status === 'pendente')
+          const paymentIsPaid = data.payments.some((payment) => payment.status === 'pago')
+          const orderWasPending = current.activePaymentOrder?.status === 'pending'
+          const orderIsPaid = data.activePaymentOrder?.status === 'paid'
+          const reservationBecameReserved = current.reservation.status !== 'reservado' && data.reservation.status === 'reservado'
+          const contractJustBecameAvailable = !current.contract && !!data.contract
+
+          if ((paymentWasPending && paymentIsPaid) || (orderWasPending && orderIsPaid)) {
+            showToast('Pagamento confirmado! Sua reserva foi atualizada.')
+          } else if (reservationBecameReserved) {
+            showToast('Reserva confirmada com sucesso.')
+          } else if (contractJustBecameAvailable) {
+            showToast('Contrato liberado para visualização e assinatura.')
+          }
+        }
+
+        return data
+      })
+
+      setError(data ? null : 'Nenhuma reserva encontrada para esse link.')
+    } catch (serviceError) {
+      setError(serviceError instanceof Error ? serviceError.message : 'Erro ao consultar a reserva.')
+    } finally {
+      if (!silent) {
+        setLoading(false)
+      }
+    }
+  }
 
   useEffect(() => {
-    setLoading(true)
-    fetchReservationLookupByToken(token)
-      .then((data) => {
-        setLookup(data)
-        if (!data) setError('Nenhuma reserva encontrada para esse link.')
-      })
-      .catch((serviceError) => setError(serviceError.message || 'Erro ao consultar a reserva.'))
-      .finally(() => setLoading(false))
+    void loadLookup()
   }, [token])
+
+  const shouldUseFastPolling = useMemo(() => {
+    if (!lookup) return true
+
+    const hasPendingPaymentOrder = Boolean(lookup.activePaymentOrder && lookup.activePaymentOrder.status === 'pending')
+    const hasPendingPayment = lookup.payments.some((payment) => payment.status === 'pendente')
+    const contractNotAvailableYet = !lookup.contract
+
+    return hasPendingPaymentOrder || hasPendingPayment || contractNotAvailableYet
+  }, [lookup])
+
+  useEffect(() => {
+    if (!token) return
+
+    const unsubscribe = subscribeToTables(['reservations', 'payments', 'payment_orders', 'contracts', 'signatures'], () => {
+      void loadLookup({ silent: true })
+    })
+
+    const runRefresh = () => {
+      void loadLookup({ silent: true })
+    }
+
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current)
+    }
+
+    intervalRef.current = window.setInterval(runRefresh, shouldUseFastPolling ? 2000 : 5000)
+
+    const handleFocus = () => runRefresh()
+    const handleVisibilityChange = () => {
+      if (!document.hidden) runRefresh()
+    }
+    const handleOnline = () => runRefresh()
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      unsubscribe()
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [token, shouldUseFastPolling])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current)
+      }
+    }
+  }, [])
 
   if (loading) {
     return (
@@ -45,6 +148,8 @@ export default function ReservationLookupPage() {
   return (
     <section className="section-block">
       <div className="container page-grid page-grid--public">
+        {toast ? <div className="toast-notification toast-notification--success">{toast}</div> : null}
+
         <article className="card details-card">
           <h1>Consulta da reserva</h1>
           <div className="details-grid">
