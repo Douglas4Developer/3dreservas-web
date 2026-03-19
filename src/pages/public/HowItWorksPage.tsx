@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 const steps = [
   {
     title: '1. Consulte a agenda',
@@ -19,18 +21,24 @@ const steps = [
 
 export default function HowItWorksPage() {
   return (
-    <section className="section-block">
+    <section className="section-block public-page-section">
       <div className="container stack-lg">
-        <div className="page-header">
+        <div className="public-page-hero public-page-hero--compact">
           <div>
-            <h1>Como reservar seu evento</h1>
-            <p>Um processo simples e direto para você escolher a data e avançar com mais confiança.</p>
+            <span className="eyebrow">Como reservar</span>
+            <h1 className="public-page-title">Um caminho simples, claro e direto para fechar sua data</h1>
+            <p className="public-page-subtitle">O cliente entende rápido o processo, sente segurança e avança com menos dúvidas.</p>
+          </div>
+          <div className="public-hero-actions">
+            <Link className="button" to="/disponibilidade">
+              Consultar disponibilidade
+            </Link>
           </div>
         </div>
 
-        <div className="card-grid card-grid--three">
+        <div className="public-bento public-bento--steps">
           {steps.map((step) => (
-            <article key={step.title} className="card feature-card">
+            <article key={step.title} className="card public-bento-card public-bento-card--glass feature-card">
               <h3>{step.title}</h3>
               <p>{step.body}</p>
             </article>

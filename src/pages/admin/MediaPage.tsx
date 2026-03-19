@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { isDirectVideoUrl } from '../../lib/media'
 import { getDefaultSpaceId } from '../../services/leads.service'
-import { fetchAdminMedia, saveExternalMedia, uploadImageMedia } from '../../services/media.service'
+import { fetchAdminMedia, saveExternalMedia, uploadImageMedia, uploadVideoMedia } from '../../services/media.service'
 import type { SpaceMedia } from '../../types/database'
 
 export default function MediaPage() {
@@ -16,6 +17,7 @@ export default function MediaPage() {
     external_url: '',
     display_order: '0',
     is_featured: true,
+    file: null as File | null,
   })
   const [imageForm, setImageForm] = useState({
     title: '',
@@ -48,19 +50,35 @@ export default function MediaPage() {
     event.preventDefault()
     setError(null)
     setSuccess(null)
+
     try {
-      await saveExternalMedia({
-        space_id: spaceId,
-        type: 'video',
-        title: videoForm.title,
-        description: videoForm.description || undefined,
-        external_url: videoForm.external_url,
-        display_order: Number(videoForm.display_order || '0'),
-        active: true,
-        is_featured: videoForm.is_featured,
-      })
-      setSuccess('Vídeo cadastrado com sucesso.')
-      setVideoForm({ title: '', description: '', external_url: '', display_order: '0', is_featured: true })
+      if (videoForm.file) {
+        await uploadVideoMedia({
+          file: videoForm.file,
+          spaceId,
+          title: videoForm.title,
+          description: videoForm.description || undefined,
+          displayOrder: Number(videoForm.display_order || '0'),
+          active: true,
+          isFeatured: videoForm.is_featured,
+        })
+      } else if (videoForm.external_url.trim()) {
+        await saveExternalMedia({
+          space_id: spaceId,
+          type: 'video',
+          title: videoForm.title,
+          description: videoForm.description || undefined,
+          external_url: videoForm.external_url.trim(),
+          display_order: Number(videoForm.display_order || '0'),
+          active: true,
+          is_featured: videoForm.is_featured,
+        })
+      } else {
+        throw new Error('Envie um arquivo de vídeo ou informe uma URL pública de vídeo.')
+      }
+
+      setSuccess('Vídeo salvo com sucesso.')
+      setVideoForm({ title: '', description: '', external_url: '', display_order: '0', is_featured: true, file: null })
       await loadData()
     } catch (serviceError) {
       setError(serviceError instanceof Error ? serviceError.message : 'Erro ao salvar vídeo.')
@@ -132,7 +150,7 @@ export default function MediaPage() {
         </article>
 
         <article className="card form-card">
-          <h3>Novo vídeo externo</h3>
+          <h3>Novo vídeo para o Hero</h3>
           <form className="form-grid" onSubmit={handleVideoSubmit}>
             <label>
               Título
@@ -143,8 +161,22 @@ export default function MediaPage() {
               <textarea rows={3} value={videoForm.description} onChange={(event) => setVideoForm((current) => ({ ...current, description: event.target.value }))} />
             </label>
             <label>
-              URL embed
-              <input value={videoForm.external_url} onChange={(event) => setVideoForm((current) => ({ ...current, external_url: event.target.value }))} required />
+              Arquivo de vídeo
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/ogg,video/*"
+                onChange={(event) => setVideoForm((current) => ({ ...current, file: event.target.files?.[0] ?? null }))}
+              />
+              <small className="table-helper">Preferencialmente MP4 ou WebM. O arquivo enviado será salvo no bucket público do Supabase.</small>
+            </label>
+            <label>
+              URL pública do vídeo
+              <input
+                value={videoForm.external_url}
+                placeholder="https://.../video.mp4"
+                onChange={(event) => setVideoForm((current) => ({ ...current, external_url: event.target.value }))}
+              />
+              <small className="table-helper">Use este campo apenas se já tiver uma URL direta do vídeo. Se enviar um arquivo, a URL não é obrigatória.</small>
             </label>
             <label>
               Ordem de exibição
@@ -152,7 +184,7 @@ export default function MediaPage() {
             </label>
             <label className="checkbox-row">
               <input type="checkbox" checked={videoForm.is_featured} onChange={(event) => setVideoForm((current) => ({ ...current, is_featured: event.target.checked }))} />
-              Destacar na home
+              Usar como destaque no Hero
             </label>
             <button className="button" type="submit">
               Salvar vídeo
@@ -189,7 +221,17 @@ export default function MediaPage() {
                   <td data-label="Ordem">{item.display_order}</td>
                   <td data-label="Destaque">{item.is_featured ? 'Sim' : 'Não'}</td>
                   <td data-label="Preview">
-                    {item.external_url ? (
+                    {item.type === 'video' && isDirectVideoUrl(item.external_url) ? (
+                      <video
+                        controls
+                        muted
+                        playsInline
+                        preload="metadata"
+                        style={{ width: '100%', maxWidth: 240, borderRadius: 16, display: 'block' }}
+                      >
+                        <source src={item.external_url ?? ''} />
+                      </video>
+                    ) : item.external_url ? (
                       <a className="button button-secondary" href={item.external_url} target="_blank" rel="noreferrer">
                         Abrir
                       </a>

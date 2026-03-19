@@ -159,3 +159,62 @@ export async function uploadImageMedia(params: {
   if (error) throw error
   return data as SpaceMedia
 }
+
+export async function uploadVideoMedia(params: {
+  file: File
+  spaceId: string
+  title: string
+  description?: string
+  displayOrder?: number
+  active?: boolean
+  isFeatured?: boolean
+}): Promise<SpaceMedia> {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      id: `media-video-upload-${Date.now()}`,
+      space_id: params.spaceId,
+      type: 'video',
+      title: params.title,
+      description: params.description ?? null,
+      storage_path: null,
+      external_url: URL.createObjectURL(params.file),
+      thumbnail_path: null,
+      display_order: params.displayOrder ?? 0,
+      active: params.active ?? true,
+      is_featured: params.isFeatured ?? false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  const extension = params.file.name.split('.').pop() || 'mp4'
+  const fileName = `${Date.now()}-${sanitizeFileName(params.file.name.replace(/\.[^.]+$/, ''))}.${extension}`
+  const storagePath = `${params.spaceId}/${fileName}`
+
+  const { error: uploadError } = await supabase.storage.from('space-media').upload(storagePath, params.file, {
+    upsert: false,
+  })
+
+  if (uploadError) throw uploadError
+
+  const publicUrl = supabase.storage.from('space-media').getPublicUrl(storagePath).data.publicUrl
+
+  const { data, error } = await supabase
+    .from('space_media')
+    .insert({
+      space_id: params.spaceId,
+      type: 'video',
+      title: params.title,
+      description: params.description ?? null,
+      storage_path: storagePath,
+      external_url: publicUrl,
+      display_order: params.displayOrder ?? 0,
+      active: params.active ?? true,
+      is_featured: params.isFeatured ?? false,
+    })
+    .select('*')
+    .single()
+
+  if (error) throw error
+  return data as SpaceMedia
+}

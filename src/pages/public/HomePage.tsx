@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ImageLightbox, type LightboxItem } from '../../components/ui/ImageLightbox'
-import { LoadingState } from '../../components/ui/LoadingState'
+import { getFeaturedHeroVideo, getPosterImage, getVideoMimeType } from '../../lib/media'
 import { getMonthBoundaries } from '../../lib/format'
 import { getPublicCalendar } from '../../services/calendar.service'
 import { fetchPublicMedia } from '../../services/media.service'
@@ -64,8 +64,9 @@ export default function HomePage() {
   const [media, setMedia] = useState<SpaceMedia[]>([])
   const [calendarEntries, setCalendarEntries] = useState<CalendarDay[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeHeroIndex, setActiveHeroIndex] = useState(0)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [heroVideoFailed, setHeroVideoFailed] = useState(false)
+  const [heroVideoReady, setHeroVideoReady] = useState(false)
 
   useEffect(() => {
     let ignore = false
@@ -92,11 +93,6 @@ export default function HomePage() {
 
   const imageItems = useMemo(() => media.filter((item) => item.type === 'image' && item.external_url), [media])
 
-  const heroImages = useMemo(() => {
-    const featured = imageItems.filter((item) => item.is_featured)
-    return (featured.length > 0 ? featured : imageItems).slice(0, 5)
-  }, [imageItems])
-
   const galleryPreview = useMemo(() => {
     if (imageItems.length <= 1) return imageItems
     return imageItems.slice(0, 4)
@@ -111,21 +107,14 @@ export default function HomePage() {
     }))
   }, [imageItems])
 
-  useEffect(() => {
-    if (heroImages.length <= 1) return
-    const intervalId = window.setInterval(() => {
-      setActiveHeroIndex((current) => (current + 1) % heroImages.length)
-    }, 4500)
-    return () => window.clearInterval(intervalId)
-  }, [heroImages.length])
+  const heroVideo = useMemo(() => getFeaturedHeroVideo(media), [media])
+  const heroPoster = useMemo(() => getPosterImage(media), [media])
+  const heroPosterUrl = heroPoster?.external_url ?? '/landing/hero.svg'
 
   useEffect(() => {
-    if (activeHeroIndex > 0 && activeHeroIndex >= heroImages.length) {
-      setActiveHeroIndex(0)
-    }
-  }, [activeHeroIndex, heroImages.length])
-
-  const activeHeroImage = heroImages[activeHeroIndex] ?? imageItems[0] ?? null
+    setHeroVideoFailed(false)
+    setHeroVideoReady(false)
+  }, [heroVideo?.id])
 
   const nextAvailableDates = useMemo(() => {
     const blockedStatuses = new Set(['bloqueio_temporario', 'aguardando_pagamento', 'reservado'])
@@ -154,9 +143,36 @@ export default function HomePage() {
 
   return (
     <main className="home-landing-clean">
-      <section className="hl-hero">
-        <div className="hl-shell hl-hero__grid">
-          <div className="hl-copy">
+      <section className="hl-hero hl-hero--immersive">
+        <div className="hl-hero__media-layer" aria-hidden="true">
+          <div
+            className={`hl-hero__poster hl-hero__poster--layer ${heroVideo?.external_url && !heroVideoFailed && heroVideoReady ? 'hl-hero__poster--hidden' : ''}`}
+            style={{ backgroundImage: `url(${heroPosterUrl})` }}
+          />
+
+          {heroVideo?.external_url && !heroVideoFailed ? (
+            <video
+              key={heroVideo.id}
+              className={`hl-hero__video ${heroVideoReady ? 'hl-hero__video--ready' : ''}`}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              poster={heroPosterUrl}
+              onCanPlay={() => setHeroVideoReady(true)}
+              onLoadedData={() => setHeroVideoReady(true)}
+              onError={() => setHeroVideoFailed(true)}
+            >
+              <source src={heroVideo.external_url} type={getVideoMimeType(heroVideo.external_url)} />
+            </video>
+          ) : null}
+
+          <div className="hl-hero__overlay" />
+        </div>
+
+        <div className="hl-shell hl-hero__grid hl-hero__grid--immersive">
+          <div className="hl-copy hl-copy--hero">
             <div className="hl-trust-strip" aria-label="Pontos principais do espaço">
               {trustItems.map((item) => (
                 <span key={item} className="hl-pill">
@@ -165,25 +181,24 @@ export default function HomePage() {
               ))}
             </div>
 
-            <span className="hl-eyebrow">Espaço de eventos 3Deventos</span>
+            <span className="hl-eyebrow hl-eyebrow--light">Espaço de eventos 3Deventos</span>
 
-            <h1 className="hl-title">O lugar certo para viver seu evento com conforto, beleza e praticidade.</h1>
+            <h1 className="hl-title">Seu evento começa com uma primeira impressão inesquecível.</h1>
 
-            <p className="hl-subtitle">
-              Um espaço pensado para aniversários, confraternizações, encontros em família e momentos especiais,
-              com estrutura completa e um caminho simples para consultar disponibilidade.
+            <p className="hl-subtitle hl-subtitle--hero">
+              Hero dinâmico com vídeo publicado no Supabase, fotos reais do espaço e um caminho simples para consultar disponibilidade e falar com a gente.
             </p>
 
             <div className="hl-actions">
-              <Link className="hl-btn hl-btn--primary" to="/disponibilidade">
+              <Link className="hl-btn hl-btn--primary-light" to="/disponibilidade">
                 Ver datas disponíveis
               </Link>
-              <Link className="hl-btn hl-btn--secondary" to="/galeria">
+              <Link className="hl-btn hl-btn--glass" to="/galeria">
                 Ver fotos do espaço
               </Link>
             </div>
 
-            <div className="hl-quick-points">
+            <div className="hl-quick-points hl-quick-points--hero">
               {highlights.map((item) => (
                 <div key={item} className="hl-quick-points__item">
                   {item}
@@ -192,52 +207,32 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="hl-hero-media">
-            {loading ? (
-              <article className="hl-media-card hl-media-card--loading">
-                <LoadingState label="Carregando fotos do espaço..." />
-              </article>
-            ) : activeHeroImage?.external_url ? (
-              <article className="hl-media-card">
-                <button
-                  type="button"
-                  className="hl-media-card__main"
-                  onClick={() => handleOpenLightbox(activeHeroImage.id)}
-                  aria-label={`Expandir foto ${activeHeroImage.title}`}
-                >
-                  <img src={activeHeroImage.external_url} alt={activeHeroImage.title} className="hl-media-card__image" />
-                  <span className="hl-media-card__tag">Clique para ampliar</span>
-                </button>
+          <div className="hl-hero-bento">
+            <article className="hl-glass-card">
+              <span className="hl-glass-card__eyebrow">Disponibilidade</span>
+              <h2>Próximas datas sugeridas</h2>
+              <div className="hl-date-list hl-date-list--hero">
+                {nextAvailableDates.length > 0 ? nextAvailableDates.map((date) => <span key={date}>{formatShortDate(date)}</span>) : <span>Consulte o calendário</span>}
+              </div>
+              <Link to="/disponibilidade" className="hl-inline-link hl-inline-link--light">
+                Abrir calendário completo
+              </Link>
+            </article>
 
-                <div className="hl-media-card__caption">
-                  <div>
-                    <strong>{activeHeroImage.title}</strong>
-                    <p>{activeHeroImage.description ?? 'Foto publicada na galeria do espaço.'}</p>
-                  </div>
-                </div>
-
-                {heroImages.length > 1 ? (
-                  <div className="hl-thumbs" role="tablist" aria-label="Fotos em destaque do espaço">
-                    {heroImages.map((item, index) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`hl-thumbs__item ${index === activeHeroIndex ? 'hl-thumbs__item--active' : ''}`}
-                        onClick={() => setActiveHeroIndex(index)}
-                        aria-label={`Mostrar foto ${item.title}`}
-                      >
-                        <img src={item.external_url ?? ''} alt={item.title} />
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </article>
-            ) : (
-              <article className="hl-media-card hl-media-card--empty">
-                <strong>Adicione imagens em destaque</strong>
-                <p>Assim que você publicar fotos ativas na mídia do espaço, elas aparecerão aqui automaticamente.</p>
-              </article>
-            )}
+            <article className="hl-glass-card hl-glass-card--compact">
+              <span className="hl-glass-card__eyebrow">Mídia dinâmica</span>
+              <h3>{heroVideo && !heroVideoFailed ? heroVideo.title : heroPoster?.title ?? 'Hero com imagem padrão'}</h3>
+              <p>
+                {heroVideo && !heroVideoFailed
+                  ? 'O vídeo do cabeçalho está vindo da sua mídia publicada. Se ele falhar, a página troca automaticamente para a imagem poster.'
+                  : 'Nenhum vídeo ativo foi encontrado. A home usa a melhor imagem publicada como poster sem quebrar o layout.'}
+              </p>
+              <div className="hl-actions hl-actions--stack-mobile">
+                <Link className="hl-btn hl-btn--glass" to="/espaco">
+                  Conhecer o espaço
+                </Link>
+              </div>
+            </article>
           </div>
         </div>
       </section>
@@ -318,7 +313,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {galleryPreview.length > 0 ? (
+          {loading ? null : galleryPreview.length > 0 ? (
             <div className="hl-gallery-grid">
               {galleryPreview.map((item, index) => (
                 <article key={item.id} className={`hl-gallery-card ${index === 0 ? 'hl-gallery-card--large' : ''}`}>

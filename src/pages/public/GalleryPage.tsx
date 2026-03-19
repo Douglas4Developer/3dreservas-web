@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ImageLightbox, type LightboxItem } from '../../components/ui/ImageLightbox'
 import { LoadingState } from '../../components/ui/LoadingState'
+import { getPosterImage, getVideoMimeType, isDirectVideoUrl } from '../../lib/media'
 import { fetchPublicMedia } from '../../services/media.service'
 import type { SpaceMedia } from '../../types/database'
 
@@ -15,6 +17,7 @@ export default function GalleryPage() {
 
   const imageItems = useMemo(() => media.filter((item) => item.type === 'image' && item.external_url), [media])
   const videoItems = useMemo(() => media.filter((item) => item.type === 'video' && item.external_url), [media])
+  const videoPoster = useMemo(() => getPosterImage(media), [media])
 
   const lightboxItems = useMemo<LightboxItem[]>(() => {
     return imageItems.map((item) => ({
@@ -31,15 +34,20 @@ export default function GalleryPage() {
   }
 
   return (
-    <section className="section-block">
+    <section className="section-block public-page-section">
       <div className="container stack-lg">
-        <div className="section-heading">
+        <div className="public-page-hero public-page-hero--compact">
           <div>
             <span className="eyebrow">Galeria do espaço</span>
-            <h1>Fotos em destaque com experiência melhor no celular e no desktop</h1>
-            <p>
-              O visitante consegue navegar por imagens maiores, expandir em tela cheia e percorrer a galeria com toques, setas e miniaturas.
+            <h1 className="public-page-title">Fotos reais para o cliente decidir com mais confiança</h1>
+            <p className="public-page-subtitle">
+              Uma galeria limpa, com imagens maiores, experiência de toque melhor no celular e visualização ampliada em tela cheia.
             </p>
+          </div>
+          <div className="public-hero-actions">
+            <Link className="button" to="/disponibilidade">
+              Ver datas disponíveis
+            </Link>
           </div>
         </div>
 
@@ -52,7 +60,7 @@ export default function GalleryPage() {
                 {imageItems.map((item, index) => (
                   <article key={item.id} className={`card media-card media-card--interactive ${index === 0 ? 'media-card--hero' : ''}`}>
                     <button type="button" className="media-card__button" onClick={() => handleExpand(item.id)}>
-                      <img src={item.external_url ?? ''} alt={item.title} className="media-card__image" />
+                      <img src={item.external_url ?? ''} alt={item.title} className="media-card__image" loading={index === 0 ? 'eager' : 'lazy'} />
                       <span className="media-card__overlay">
                         <strong>{item.title}</strong>
                         <span>{item.description ?? 'Expandir imagem'}</span>
@@ -84,9 +92,17 @@ export default function GalleryPage() {
                         <strong>{item.title}</strong>
                         <p>{item.description}</p>
                       </div>
-                      <div className="video-embed">
-                        <iframe src={item.external_url ?? ''} title={item.title} allowFullScreen />
-                      </div>
+                      {isDirectVideoUrl(item.external_url) ? (
+                        <div className="video-embed video-embed--native">
+                          <video controls playsInline preload="metadata" poster={videoPoster?.external_url ?? undefined}>
+                            <source src={item.external_url ?? ''} type={getVideoMimeType(item.external_url)} />
+                          </video>
+                        </div>
+                      ) : (
+                        <div className="video-embed">
+                          <iframe src={item.external_url ?? ''} title={item.title} allowFullScreen loading="lazy" />
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>

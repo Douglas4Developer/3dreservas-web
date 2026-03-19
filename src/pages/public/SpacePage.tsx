@@ -13,6 +13,13 @@ const amenities = [
   'Funcionamento por diária, com pacote personalizado para mais de um dia',
 ]
 
+const reasons = [
+  'Ambiente bonito para receber bem e render boas fotos',
+  'Estrutura confortável para eventos de um dia ou mais',
+  'Consulta de datas online para agilizar a decisão',
+  'Reserva organizada para gerar mais segurança na confirmação',
+]
+
 export default function SpacePage() {
   const [media, setMedia] = useState<SpaceMedia[]>([])
   const [loading, setLoading] = useState(true)
@@ -21,53 +28,79 @@ export default function SpacePage() {
     fetchPublicMedia().then(setMedia).finally(() => setLoading(false))
   }, [])
 
-  const heroImage = useMemo(() => media.find((item) => item.type === 'image'), [media])
+  const heroImage = useMemo(() => media.find((item) => item.type === 'image' && item.external_url), [media])
 
   return (
-    <section className="section-block">
+    <section className="section-block public-page-section">
       <div className="container stack-lg">
-        <div className="page-header">
+        <div className="public-page-hero">
           <div>
-            <h1>Conheça o 3Deventos</h1>
-            <p>Um espaço preparado para receber seu evento com conforto, estrutura e um visual que encanta já no primeiro olhar.</p>
+            <span className="eyebrow">O espaço</span>
+            <h1 className="public-page-title">Estrutura completa para momentos especiais</h1>
+            <p className="public-page-subtitle">
+              Um ambiente confortável, bonito e funcional para aniversários, encontros, confraternizações e celebrações em família.
+            </p>
           </div>
-          <Link className="button" to="/disponibilidade">
-            Consultar disponibilidade
-          </Link>
+          <div className="public-hero-actions">
+            <Link className="button" to="/disponibilidade">
+              Consultar disponibilidade
+            </Link>
+            <Link className="button button-secondary" to="/galeria">
+              Ver mais fotos
+            </Link>
+          </div>
         </div>
 
         {loading ? (
           <LoadingState label="Carregando apresentação do espaço..." />
         ) : (
-          <div className="page-grid page-grid--public">
-            <article className="card details-card">
-              {heroImage?.external_url ? <img src={heroImage.external_url} alt={heroImage.title} className="hero-banner-image" /> : null}
-              <h2>Estrutura completa para momentos especiais</h2>
-              <p>
-                Ideal para aniversários, encontros, confraternizações e celebrações em família, com áreas de apoio que tornam a experiência mais prática para você e seus convidados.
-              </p>
-              <div className="amenities-grid">
+          <div className="public-bento public-bento--space">
+            <article className="card public-bento-card public-bento-card--hero">
+              {heroImage?.external_url ? (
+                <img src={heroImage.external_url} alt={heroImage.title} className="public-hero-photo" loading="eager" />
+              ) : null}
+              <div className="stack-list">
+                <h2>O espaço já impressiona antes mesmo do primeiro contato</h2>
+                <p>
+                  Quem acessa a página entende rápido o valor do local: conforto, apoio para convidados, boa apresentação e praticidade para organizar o evento.
+                </p>
+              </div>
+            </article>
+
+            <article className="card public-bento-card public-bento-card--glass">
+              <span className="eyebrow">Destaques</span>
+              <div className="public-chip-list public-chip-list--soft">
+                {amenities.slice(0, 4).map((item) => (
+                  <span key={item} className="public-chip public-chip--soft">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </article>
+
+            <article className="card public-bento-card public-bento-card--glass">
+              <h3>O que está incluso</h3>
+              <div className="public-check-list">
                 {amenities.map((item) => (
-                  <div key={item} className="line-card line-card--soft">
+                  <div key={item} className="public-check-list__item">
+                    <span className="public-check-list__icon">✓</span>
                     <span>{item}</span>
                   </div>
                 ))}
               </div>
             </article>
 
-            <aside className="card details-card">
-              <h2>Por que esse espaço chama atenção</h2>
-              <ul className="check-list">
-                <li>Ambiente pronto para receber bem e impressionar nas fotos</li>
-                <li>Estrutura confortável para eventos de um dia ou mais</li>
-                <li>Consulta de datas online para facilitar sua escolha</li>
-                <li>Atendimento rápido para tirar dúvidas e alinhar detalhes</li>
-                <li>Reserva organizada para dar mais segurança na confirmação</li>
-              </ul>
-              <Link className="button" to="/galeria">
-                Ver mais fotos
-              </Link>
-            </aside>
+            <article className="card public-bento-card public-bento-card--glass">
+              <h3>Por que o cliente decide mais rápido</h3>
+              <div className="public-check-list">
+                {reasons.map((item) => (
+                  <div key={item} className="public-check-list__item">
+                    <span className="public-check-list__icon">•</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
           </div>
         )}
       </div>
