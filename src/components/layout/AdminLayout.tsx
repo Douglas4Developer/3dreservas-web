@@ -52,7 +52,8 @@ export default function AdminLayout() {
                     className="sidebar-caption"
                     style={{ margin: 0, fontSize: '0.85rem', lineHeight: 1.3 }}
                   >
-                    Operação comercial, agenda, pagamentos e vitrine do 3Deventos.
+                    Desenvolvido por Douglas S.S. Ferreira 
+                    3Deventos.
                   </p>
                 </div>
               </div>

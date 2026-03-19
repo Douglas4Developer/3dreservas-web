@@ -247,7 +247,7 @@ export default function HomePage() {
           <div className="hl-section__header hl-section__header--compact">
             <div>
               <span className="hl-eyebrow">Por que escolher</span>
-              <h2>Uma apresentação comercial que ajuda o cliente a decidir mais rápido</h2>
+              <h2>Um espaço completo</h2>
             </div>
           </div>
 
@@ -334,8 +334,7 @@ export default function HomePage() {
             </div>
           ) : (
             <article className="hl-card hl-card--empty">
-              <h3>Sua galeria aparece aqui automaticamente</h3>
-              <p>Assim que houver fotos ativas no banco, esta prévia comercial ficará ainda mais forte.</p>
+              <h3>Confira agora o que oferecemos</h3>
             </article>
           )}
         </div>
@@ -347,7 +346,7 @@ export default function HomePage() {
             <div>
               <span className="hl-eyebrow hl-eyebrow--light">Pronto para reservar?</span>
               <h2>Escolha uma data, veja as fotos e fale com a gente para fechar seu evento.</h2>
-              <p>Uma experiência mais moderna, clara e comercial para transformar visitas em reservas.</p>
+              <p>Seu evento merece o melhor!</p>
             </div>
 
             <div className="hl-actions hl-actions--cta">
