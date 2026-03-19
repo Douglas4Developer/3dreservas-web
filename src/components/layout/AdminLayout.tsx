@@ -95,7 +95,7 @@ export default function AdminLayout() {
                 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}
               >
                 <img
-                  src="/logopng.svg"
+                  src="/logopng.png"
                   alt="3DReservas"
                   style={{ height: '44px', width: 'auto' }}
                 />

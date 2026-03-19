@@ -3540,6 +3540,7 @@ textarea {
   display: none;
 }
 
+/* Atalhos superiores do admin foram removidos no mobile para evitar navegação duplicada e sobreposição visual. */
 .admin-mobile-tabs {
   gap: 0.65rem;
   margin-top: 0.85rem;
@@ -3647,9 +3648,12 @@ textarea {
     display: none;
   }
 
-  .admin-mobile-tabs,
   .admin-bottom-nav {
     display: grid;
+  }
+
+  .admin-mobile-tabs {
+    display: none !important;
   }
 
   .admin-page-wrapper {
@@ -3732,14 +3736,7 @@ textarea {
   }
 
   .admin-mobile-tabs {
-    margin-top: 0.75rem;
-    padding-bottom: 0.15rem;
-  }
-
-  .admin-mobile-tabs a {
-    min-height: 40px;
-    padding: 0.66rem 0.9rem;
-    font-size: 0.9rem;
+    display: none !important;
   }
 
   .admin-bottom-nav {
