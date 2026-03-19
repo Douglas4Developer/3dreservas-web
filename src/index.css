@@ -3797,3 +3797,41 @@ textarea {
     min-height: 56px;
   }
 }
+
+
+/* ===== Admin mobile topbar visibility fix ===== */
+@media (max-width: 920px) {
+  .admin-topbar__actions {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .sidebar-icon-button--mobile {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    border: 1px solid rgba(21, 101, 216, 0.14);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96);
+    color: var(--primary);
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+    font-size: 1.35rem;
+    line-height: 1;
+  }
+
+  .sidebar-icon-button--mobile:hover,
+  .sidebar-icon-button--mobile:active {
+    background: rgba(232, 238, 251, 0.96);
+  }
+
+  .admin-topbar__actions > div {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-topbar__actions h2 {
+    margin: 0;
+  }
+}
