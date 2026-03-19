@@ -65,7 +65,7 @@ export default function PublicLayout() {
       <header className="public-header">
         <div className="container public-header__inner public-header__inner--responsive">
           <Link to="/" className="brand-mark" onClick={() => setMenuOpen(false)} aria-label="Ir para a página inicial">
-            <img src="/logopng.svg" alt="3DReservas" className="public-brand-logo" />
+            <img src="/logopng.png" alt="3DReservas" className="public-brand-logo" />
           </Link>
 
           {!isTransactionalFlow ? (
@@ -180,7 +180,7 @@ export default function PublicLayout() {
       <footer className="public-footer">
         <div className="container public-footer__inner public-footer__inner--enhanced">
           <div>
-            <img src="/logopng.svg" alt="3DReservas" className="public-brand-logo public-brand-logo--footer" />
+            <img src="/logopng.png" alt="3DReservas" className="public-brand-logo public-brand-logo--footer" />
             <p>Um espaço preparado para celebrar aniversários, encontros, confraternizações e momentos especiais com conforto.</p>
           </div>
           <div>
