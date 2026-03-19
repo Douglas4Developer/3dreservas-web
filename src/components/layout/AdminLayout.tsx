@@ -193,6 +193,7 @@ export default function AdminLayout() {
         <div className="admin-page-wrapper">
           <Outlet />
         </div>
+        <div className="admin-bottom-nav-spacer" aria-hidden="true" />
 
         <nav className="admin-bottom-nav" aria-label="Navegação principal mobile">
           {mobileQuickItems.map((item) => (
