@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatCard } from '../../components/ui/StatCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { AdminDashboardCharts } from '../../components/dashboard/AdminDashboardCharts'
 import { formatCurrency, formatDate } from '../../lib/format'
 import { subscribeToTables } from '../../lib/realtime'
 import { fetchDashboardSummary } from '../../services/dashboard.service'
@@ -16,6 +17,16 @@ const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Se
 function getMonthKey(dateString: string) {
   const date = new Date(`${dateString}T12:00:00`)
   return `${date.getFullYear()}-${date.getMonth()}`
+}
+
+
+function startOfWeek(date: Date) {
+  const value = new Date(date)
+  const day = value.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  value.setDate(value.getDate() + diff)
+  value.setHours(0, 0, 0, 0)
+  return value
 }
 
 
@@ -122,6 +133,58 @@ export default function DashboardPage() {
     })
   }, [orderedReservations])
 
+  const revenueSeries = useMemo(
+    () => occupancyByMonth.map((item) => ({
+      key: item.key,
+      label: item.label,
+      value: item.projectedRevenue,
+      occupancy: item.occupancy,
+    })),
+    [occupancyByMonth],
+  )
+
+  const statusChartSeries = useMemo(
+    () => [
+      { status: 'reservado' as ReservationStatus, label: 'Reservado', color: '#2563eb' },
+      { status: 'aguardando_pagamento' as ReservationStatus, label: 'Aguardando', color: '#f59e0b' },
+      { status: 'bloqueio_temporario' as ReservationStatus, label: 'Bloqueio', color: '#7c3aed' },
+      { status: 'interesse_enviado' as ReservationStatus, label: 'Interesse', color: '#10b981' },
+      { status: 'cancelado' as ReservationStatus, label: 'Cancelado', color: '#ef4444' },
+    ].map((item) => ({
+      label: item.label,
+      color: item.color,
+      count: orderedReservations.filter((reservation) => reservation.status === item.status).length,
+    })),
+    [orderedReservations],
+  )
+
+  const weeklyCreationSeries = useMemo(() => {
+    const today = new Date()
+    const currentWeek = startOfWeek(today)
+    const weeks = Array.from({ length: 8 }, (_, index) => {
+      const base = new Date(currentWeek)
+      base.setDate(base.getDate() - (7 * (7 - index)))
+      const end = new Date(base)
+      end.setDate(base.getDate() + 6)
+      return {
+        key: base.toISOString().slice(0, 10),
+        start: base,
+        end,
+        label: `${String(base.getDate()).padStart(2, '0')}/${String(base.getMonth() + 1).padStart(2, '0')}`,
+        shortLabel: `${String(base.getDate()).padStart(2, '0')}/${String(base.getMonth() + 1).padStart(2, '0')}`,
+      }
+    })
+
+    return weeks.map((week) => ({
+      ...week,
+      count: orderedReservations.filter((reservation) => {
+        const createdAt = new Date(reservation.created_at)
+        return createdAt >= week.start && createdAt <= week.end
+      }).length,
+    }))
+  }, [orderedReservations])
+
+
   if (loading || !summary) {
     return (
       <div className="stack-lg">
@@ -145,6 +208,8 @@ export default function DashboardPage() {
         <StatCard label="Ticket médio" value={formatCurrency(averageTicket)} hint="Reservas confirmadas" />
         <StatCard label="Ocupação" value={`${summary.occupancyRate}%`} hint={`Mensagens recentes: ${recentMessagesCount}`} />
       </div>
+
+      <AdminDashboardCharts revenueSeries={revenueSeries} statusSeries={statusChartSeries} weeklySeries={weeklyCreationSeries} />
 
       <section className="dashboard-airbnb-grid">
         <article className="card dashboard-spotlight">
