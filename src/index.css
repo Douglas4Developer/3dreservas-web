@@ -3474,3 +3474,33 @@ textarea {
     border-radius: 22px;
   }
 }
+
+
+/* ===== Mobile menu interaction hotfix ===== */
+.public-shell--menu-open main,
+.public-shell--menu-open .public-footer,
+.public-shell--menu-open .floating-cta-bar,
+.public-shell--menu-open .public-mobile-tabs {
+  pointer-events: none;
+}
+
+.public-shell--menu-open .public-header,
+.public-shell--menu-open .public-mobile-menu,
+.public-shell--menu-open .public-mobile-menu * {
+  pointer-events: auto;
+}
+
+.public-mobile-menu__panel {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 920px) {
+  .public-header {
+    z-index: 120;
+  }
+
+  .public-mobile-menu {
+    z-index: 140;
+  }
+}

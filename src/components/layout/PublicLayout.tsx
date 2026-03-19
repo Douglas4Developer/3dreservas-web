@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { isSupabaseConfigured } from '../../lib/supabase'
 
@@ -20,6 +20,9 @@ export default function PublicLayout() {
 
   const whatsappUrl = 'https://api.whatsapp.com/send/?phone=556284876724&text=Olá! Quero consultar uma data para o meu evento.&type=phone_number&app_absent=0'
 
+  const closeMenu = useCallback(() => setMenuOpen(false), [])
+  const toggleMenu = useCallback(() => setMenuOpen((value) => !value), [])
+
   const isTransactionalFlow = useMemo(
     () => transactionalPrefixes.some((prefix) => location.pathname.startsWith(prefix)),
     [location.pathname],
@@ -33,15 +36,15 @@ export default function PublicLayout() {
   }, [menuOpen])
 
   useEffect(() => {
-    setMenuOpen(false)
-  }, [location.pathname])
+    closeMenu()
+  }, [location.pathname, location.search, location.hash, closeMenu])
 
   useEffect(() => {
     if (!menuOpen) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setMenuOpen(false)
+        closeMenu()
       }
     }
 
@@ -60,11 +63,27 @@ export default function PublicLayout() {
     return () => window.cancelAnimationFrame(frame)
   }, [menuOpen])
 
+  useEffect(() => {
+    if (!menuOpen) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (!target) return
+      const panel = menuPanelRef.current
+      if (panel && !panel.contains(target)) {
+        closeMenu()
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true)
+  }, [menuOpen, closeMenu])
+
   return (
     <div className={`public-shell ${menuOpen ? 'public-shell--menu-open' : ''}`}>
       <header className="public-header">
         <div className="container public-header__inner public-header__inner--responsive">
-          <Link to="/" className="brand-mark" onClick={() => setMenuOpen(false)} aria-label="Ir para a página inicial">
+          <Link to="/" className="brand-mark" onClick={closeMenu} aria-label="Ir para a página inicial">
             <img src="/logopng.png" alt="3DReservas" className="public-brand-logo" />
           </Link>
 
@@ -72,7 +91,7 @@ export default function PublicLayout() {
             <>
               <nav className="public-nav public-nav--desktop" aria-label="Navegação principal do site">
                 {navigation.map((item) => (
-                  <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={() => setMenuOpen(false)}>
+                  <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={closeMenu}>
                     {item.label}
                   </NavLink>
                 ))}
@@ -94,7 +113,7 @@ export default function PublicLayout() {
                 aria-expanded={menuOpen}
                 aria-controls="public-mobile-menu-panel"
                 aria-haspopup="dialog"
-                onClick={() => setMenuOpen((value) => !value)}
+                onClick={toggleMenu}
               >
                 <span />
                 <span />
@@ -116,9 +135,9 @@ export default function PublicLayout() {
           </div>
         ) : null}
 
-        {!isTransactionalFlow ? (
-          <div className={`public-mobile-menu ${menuOpen ? 'public-mobile-menu--open' : ''}`} aria-hidden={!menuOpen}>
-            <button className="public-mobile-menu__backdrop" type="button" onClick={() => setMenuOpen(false)} aria-label="Fechar menu" />
+        {!isTransactionalFlow && menuOpen ? (
+          <div className="public-mobile-menu public-mobile-menu--open" aria-hidden={!menuOpen}>
+            <button className="public-mobile-menu__backdrop" type="button" onClick={closeMenu} aria-label="Fechar menu" />
             <div
               ref={menuPanelRef}
               className="public-mobile-menu__panel"
@@ -135,7 +154,7 @@ export default function PublicLayout() {
                 <button
                   type="button"
                   className="public-mobile-menu__close"
-                  onClick={() => setMenuOpen(false)}
+                  onClick={closeMenu}
                   aria-label="Fechar menu"
                 >
                   ✕
@@ -144,7 +163,7 @@ export default function PublicLayout() {
 
               <nav className="public-mobile-menu__nav" aria-label="Menu mobile do site">
                 {navigation.map((item) => (
-                  <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={() => setMenuOpen(false)}>
+                  <NavLink key={item.to} to={item.to} end={item.to === '/'} onClick={closeMenu}>
                     <span className="public-mobile-menu__nav-copy">
                       <strong>{item.label}</strong>
                       <small>{item.description}</small>
@@ -155,10 +174,10 @@ export default function PublicLayout() {
               </nav>
 
               <div className="public-mobile-menu__actions">
-                <Link className="button" to="/disponibilidade" onClick={() => setMenuOpen(false)}>
+                <Link className="button" to="/disponibilidade" onClick={closeMenu}>
                   Ver datas disponíveis
                 </Link>
-                <a className="button button-secondary" href={whatsappUrl} target="_blank" rel="noreferrer" onClick={() => setMenuOpen(false)}>
+                <a className="button button-secondary" href={whatsappUrl} target="_blank" rel="noreferrer" onClick={closeMenu}>
                   Falar no WhatsApp
                 </a>
               </div>
