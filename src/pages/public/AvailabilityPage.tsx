@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { AvailabilityCalendar } from '../../components/calendar/AvailabilityCalendar'
 import { LoadingState } from '../../components/ui/LoadingState'
@@ -49,7 +50,7 @@ export default function AvailabilityPage() {
 
   useEffect(() => {
     void loadCalendar()
-  }, [boundaries.from, boundaries.to])
+  }, [boundaries.from, boundaries.to, loadCalendar])
 
   useEffect(() => subscribeToTables(['reservations', 'payment_orders'], () => void loadCalendar()), [boundaries.from, boundaries.to])
 

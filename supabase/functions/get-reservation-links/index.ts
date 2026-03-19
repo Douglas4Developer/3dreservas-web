@@ -6,6 +6,7 @@ import {
   ensureSecureLink,
   jsonResponse,
   requireAuthenticatedUser,
+  sanitizePhone,
 } from '../_shared/index.ts'
 
 serve(async (req: Request) => {
@@ -69,7 +70,7 @@ serve(async (req: Request) => {
         )
       : null
 
-    const normalizedPhone = String(reservation.customer_phone ?? '').replace(/\D/g, '')
+    const normalizedPhone = sanitizePhone(String(reservation.customer_phone ?? ''))
 
     return jsonResponse({
       statusUrl,

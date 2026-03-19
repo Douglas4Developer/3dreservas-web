@@ -108,7 +108,17 @@ export async function requireAuthenticatedUser(req: Request) {
 }
 
 export function sanitizePhone(phone: string) {
-  return phone.replace(/\D/g, '')
+  const digits = String(phone ?? '').replace(/\D/g, '')
+
+  if (!digits) return ''
+
+  if (digits.startsWith('55')) return digits
+
+  if (digits.length === 10 || digits.length === 11) {
+    return `55${digits}`
+  }
+
+  return digits
 }
 
 function formatCurrency(value?: number | null) {
