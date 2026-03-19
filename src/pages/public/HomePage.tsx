@@ -109,7 +109,7 @@ export default function HomePage() {
 
   const heroVideo = useMemo(() => getFeaturedHeroVideo(media), [media])
   const heroPoster = useMemo(() => getPosterImage(media), [media])
-  const heroPosterUrl = heroPoster?.external_url ?? '/landing/hero.svg'
+  const heroPosterUrl = heroPoster?.external_url ?? '/landing/logopng.png'
 
   useEffect(() => {
     setHeroVideoFailed(false)
@@ -183,10 +183,10 @@ export default function HomePage() {
 
             <span className="hl-eyebrow hl-eyebrow--light">Espaço de eventos 3Deventos</span>
 
-            <h1 className="hl-title">Seu evento começa com uma primeira impressão inesquecível.</h1>
+            <h1 className="hl-title">Seu evento do melhor jeito.</h1>
 
             <p className="hl-subtitle hl-subtitle--hero">
-              Hero dinâmico com vídeo publicado no Supabase, fotos reais do espaço e um caminho simples para consultar disponibilidade e falar com a gente.
+              No 3deventos, cada detalhe foi planejado para transformar sua celebração em uma memória inesquecível. Um espaço amplo, moderno e versátil, pronto para receber seus convidados com todo o conforto que eles merecem.
             </p>
 
             <div className="hl-actions">
@@ -220,13 +220,13 @@ export default function HomePage() {
             </article>
 
             <article className="hl-glass-card hl-glass-card--compact">
-              <span className="hl-glass-card__eyebrow">Mídia dinâmica</span>
-              <h3>{heroVideo && !heroVideoFailed ? heroVideo.title : heroPoster?.title ?? 'Hero com imagem padrão'}</h3>
+              <span className="hl-glass-card__eyebrow">O cenário perfeito para as suas melhores histórias.</span>
+              {/* <h3>{heroVideo && !heroVideoFailed ? heroVideo.title : heroPoster?.title ?? 'Hero com imagem padrão'}</h3>
               <p>
                 {heroVideo && !heroVideoFailed
                   ? 'O vídeo do cabeçalho está vindo da sua mídia publicada. Se ele falhar, a página troca automaticamente para a imagem poster.'
                   : 'Nenhum vídeo ativo foi encontrado. A home usa a melhor imagem publicada como poster sem quebrar o layout.'}
-              </p>
+              </p> */}
               <div className="hl-actions hl-actions--stack-mobile">
                 <Link className="hl-btn hl-btn--glass" to="/espaco">
                   Conhecer o espaço
