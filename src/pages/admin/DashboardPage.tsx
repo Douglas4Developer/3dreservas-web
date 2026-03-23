@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatCard } from '../../components/ui/StatCard'
 import { StatusBadge } from '../../components/ui/StatusBadge'
-import { AdminDashboardCharts } from '../../components/dashboard/AdminDashboardCharts'
 import { formatCurrency, formatDate } from '../../lib/format'
 import { subscribeToTables } from '../../lib/realtime'
 import { fetchDashboardSummary } from '../../services/dashboard.service'
@@ -17,16 +16,6 @@ const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Se
 function getMonthKey(dateString: string) {
   const date = new Date(`${dateString}T12:00:00`)
   return `${date.getFullYear()}-${date.getMonth()}`
-}
-
-
-function startOfWeek(date: Date) {
-  const value = new Date(date)
-  const day = value.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  value.setDate(value.getDate() + diff)
-  value.setHours(0, 0, 0, 0)
-  return value
 }
 
 
@@ -93,16 +82,20 @@ export default function DashboardPage() {
   )
 
   const futureReservations = useMemo(() => orderedReservations.filter((item) => getDaysUntil(item.event_date) >= 0), [orderedReservations])
-  const nextReservations = futureReservations.slice(0, 5)
+  const futureReservedReservations = useMemo(() => futureReservations.filter((item) => item.status === 'reservado'), [futureReservations])
+  const nextReservations = futureReservedReservations.slice(0, 5)
   const reservedReservations = orderedReservations.filter((item) => item.status === 'reservado')
-  const futureReservedReservations = useMemo(
-    () => futureReservations.filter((item) => item.status === 'reservado'),
-    [futureReservations],
-  )
-  const expectedRevenue = futureReservedReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
+  const totalUpcomingEvents = futureReservedReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
+  const upcomingEntryAmount = futureReservedReservations.reduce((total, item) => total + (item.entry_amount ?? 0), 0)
+  const upcomingRemainingAmount = futureReservedReservations.reduce((total, item) => {
+    if (typeof item.remaining_amount === 'number') return total + item.remaining_amount
+    const gross = item.total_amount ?? 0
+    const entry = item.entry_amount ?? 0
+    return total + Math.max(gross - entry, 0)
+  }, 0)
   const confirmedRevenue = reservedReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
-  const averageTicket = orderedReservations.length > 0 ? Math.round(confirmedRevenue / Math.max(reservedReservations.length, 1)) : 0
-  const upcomingConfirmed = futureReservations.filter((item) => item.status === 'reservado').length
+  const averageTicket = reservedReservations.length > 0 ? Math.round(confirmedRevenue / reservedReservations.length) : 0
+  const upcomingConfirmed = futureReservedReservations.length
   const nextEvent = nextReservations[0] ?? null
 
   const statusBreakdown = useMemo(() => {
@@ -137,58 +130,6 @@ export default function DashboardPage() {
     })
   }, [orderedReservations])
 
-  const revenueSeries = useMemo(
-    () => occupancyByMonth.map((item) => ({
-      key: item.key,
-      label: item.label,
-      value: item.projectedRevenue,
-      occupancy: item.occupancy,
-    })),
-    [occupancyByMonth],
-  )
-
-  const statusChartSeries = useMemo(
-    () => [
-      { status: 'reservado' as ReservationStatus, label: 'Reservado', color: '#2563eb' },
-      { status: 'aguardando_pagamento' as ReservationStatus, label: 'Aguardando', color: '#f59e0b' },
-      { status: 'bloqueio_temporario' as ReservationStatus, label: 'Bloqueio', color: '#7c3aed' },
-      { status: 'interesse_enviado' as ReservationStatus, label: 'Interesse', color: '#10b981' },
-      { status: 'cancelado' as ReservationStatus, label: 'Cancelado', color: '#ef4444' },
-    ].map((item) => ({
-      label: item.label,
-      color: item.color,
-      count: orderedReservations.filter((reservation) => reservation.status === item.status).length,
-    })),
-    [orderedReservations],
-  )
-
-  const weeklyCreationSeries = useMemo(() => {
-    const today = new Date()
-    const currentWeek = startOfWeek(today)
-    const weeks = Array.from({ length: 8 }, (_, index) => {
-      const base = new Date(currentWeek)
-      base.setDate(base.getDate() - (7 * (7 - index)))
-      const end = new Date(base)
-      end.setDate(base.getDate() + 6)
-      return {
-        key: base.toISOString().slice(0, 10),
-        start: base,
-        end,
-        label: `${String(base.getDate()).padStart(2, '0')}/${String(base.getMonth() + 1).padStart(2, '0')}`,
-        shortLabel: `${String(base.getDate()).padStart(2, '0')}/${String(base.getMonth() + 1).padStart(2, '0')}`,
-      }
-    })
-
-    return weeks.map((week) => ({
-      ...week,
-      count: orderedReservations.filter((reservation) => {
-        const createdAt = new Date(reservation.created_at)
-        return createdAt >= week.start && createdAt <= week.end
-      }).length,
-    }))
-  }, [orderedReservations])
-
-
   if (loading || !summary) {
     return (
       <div className="stack-lg">
@@ -208,12 +149,11 @@ export default function DashboardPage() {
         <StatCard label="Interesses" value={summary.totalLeads} hint="Clientes em negociação" />
         <StatCard label="Reservas" value={summary.totalReservations} hint="Todas as reservas" />
         <StatCard label="Confirmadas" value={summary.confirmedReservations} hint="Datas já fechadas" />
-        <StatCard label="Receita prevista" value={formatCurrency(expectedRevenue)} hint="Próximos eventos" />
+        <StatCard label="Total próximos eventos" value={formatCurrency(totalUpcomingEvents)} hint="Somente reservas futuras confirmadas" />
+        <StatCard label="Saldo a receber" value={formatCurrency(upcomingRemainingAmount)} hint={`Entradas já consideradas: ${formatCurrency(upcomingEntryAmount)}`} />
         <StatCard label="Ticket médio" value={formatCurrency(averageTicket)} hint="Reservas confirmadas" />
         <StatCard label="Ocupação" value={`${summary.occupancyRate}%`} hint={`Mensagens recentes: ${recentMessagesCount}`} />
       </div>
-
-      <AdminDashboardCharts revenueSeries={revenueSeries} statusSeries={statusChartSeries} weeklySeries={weeklyCreationSeries} />
 
       <section className="dashboard-airbnb-grid">
         <article className="card dashboard-spotlight">
@@ -247,19 +187,19 @@ export default function DashboardPage() {
         <article className="card dashboard-side-metrics">
           <div className="dashboard-side-metrics__grid">
             <div className="dashboard-mini-card">
-              <span>Receita confirmada</span>
-              <strong>{formatCurrency(confirmedRevenue)}</strong>
-              <small>Somente reservas no status reservado</small>
+              <span>Total próximos eventos</span>
+              <strong>{formatCurrency(totalUpcomingEvents)}</strong>
+              <small>Valor bruto das reservas futuras confirmadas</small>
             </div>
             <div className="dashboard-mini-card">
-              <span>Checkouts ativos</span>
-              <strong>{pendingPaymentOrders.length}</strong>
-              <small>Links aguardando pagamento</small>
+              <span>Saldo a receber</span>
+              <strong>{formatCurrency(upcomingRemainingAmount)}</strong>
+              <small>Somente o saldo restante dos próximos eventos</small>
             </div>
             <div className="dashboard-mini-card">
-              <span>Pagamentos pendentes</span>
-              <strong>{pendingPayments.length}</strong>
-              <small>Aguardando conferência interna</small>
+              <span>Entradas previstas</span>
+              <strong>{formatCurrency(upcomingEntryAmount)}</strong>
+              <small>Parte já considerada antes do saldo final</small>
             </div>
             <div className="dashboard-mini-card">
               <span>Próximo evento</span>
@@ -306,20 +246,41 @@ export default function DashboardPage() {
             {nextReservations.length === 0 ? (
               <p>Nenhuma reserva cadastrada.</p>
             ) : (
-              nextReservations.map((reservation) => (
-                <div className="line-card line-card--elevated" key={reservation.id}>
-                  <div>
-                    <strong>{reservation.customer_name}</strong>
-                    <p>
-                      {formatDate(reservation.event_date)} • {formatCurrency(reservation.total_amount)}
-                    </p>
+              nextReservations.map((reservation) => {
+                const totalAmount = reservation.total_amount ?? 0
+                const entryAmount = reservation.entry_amount ?? 0
+                const remainingAmount = typeof reservation.remaining_amount === 'number' ? reservation.remaining_amount : Math.max(totalAmount - entryAmount, 0)
+
+                return (
+                  <div className="line-card line-card--elevated dashboard-event-card" key={reservation.id}>
+                    <div className="dashboard-event-card__top">
+                      <div>
+                        <strong>{reservation.customer_name}</strong>
+                        <p>{formatDate(reservation.event_date)}</p>
+                      </div>
+                      <div className="dashboard-line-meta">
+                        <small>{getDaysUntil(reservation.event_date) === 0 ? 'Hoje' : `Faltam ${getDaysUntil(reservation.event_date)} dia(s)`}</small>
+                        <StatusBadge status={reservation.status} />
+                      </div>
+                    </div>
+
+                    <div className="dashboard-event-card__amounts">
+                      <div className="amount-pill">
+                        <span>Total</span>
+                        <strong>{formatCurrency(totalAmount)}</strong>
+                      </div>
+                      <div className="amount-pill">
+                        <span>Entrada</span>
+                        <strong>{formatCurrency(entryAmount)}</strong>
+                      </div>
+                      <div className="amount-pill amount-pill--highlight">
+                        <span>Saldo</span>
+                        <strong>{formatCurrency(remainingAmount)}</strong>
+                      </div>
+                    </div>
                   </div>
-                  <div className="dashboard-line-meta">
-                    <small>{getDaysUntil(reservation.event_date) === 0 ? 'Hoje' : `Faltam ${getDaysUntil(reservation.event_date)} dia(s)`}</small>
-                    <StatusBadge status={reservation.status} />
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </article>
