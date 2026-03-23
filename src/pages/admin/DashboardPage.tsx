@@ -95,7 +95,11 @@ export default function DashboardPage() {
   const futureReservations = useMemo(() => orderedReservations.filter((item) => getDaysUntil(item.event_date) >= 0), [orderedReservations])
   const nextReservations = futureReservations.slice(0, 5)
   const reservedReservations = orderedReservations.filter((item) => item.status === 'reservado')
-  const expectedRevenue = futureReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
+  const futureReservedReservations = useMemo(
+    () => futureReservations.filter((item) => item.status === 'reservado'),
+    [futureReservations],
+  )
+  const expectedRevenue = futureReservedReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
   const confirmedRevenue = reservedReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
   const averageTicket = orderedReservations.length > 0 ? Math.round(confirmedRevenue / Math.max(reservedReservations.length, 1)) : 0
   const upcomingConfirmed = futureReservations.filter((item) => item.status === 'reservado').length
