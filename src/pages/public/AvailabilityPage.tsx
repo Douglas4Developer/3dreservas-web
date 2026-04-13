@@ -137,7 +137,6 @@ export default function AvailabilityPage() {
         <div className="public-page-hero public-page-hero--compact">
           <div>
             <span className="eyebrow">Disponibilidade</span>
-            <h1 className="public-page-title">Escolha uma data com clareza em qualquer tamanho de tela</h1>
             <p className="public-page-subtitle">
               Consulte o mês de {monthLabel}, veja rapidamente o que está livre e envie sua solicitação sem depender de contato prévio.
             </p>
