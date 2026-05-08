@@ -3651,3 +3651,140 @@ textarea {
     text-overflow: ellipsis;
   }
 }
+
+/* Dashboard monthly financial view */
+.dashboard-filter-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-radius: 28px;
+  box-shadow: var(--shadow-soft);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.92));
+}
+
+.dashboard-filter-card h3 {
+  margin: 0.35rem 0 0.25rem;
+  font-size: 1.3rem;
+}
+
+.dashboard-filter-card p {
+  margin: 0;
+  color: var(--text-soft);
+  max-width: 720px;
+}
+
+.dashboard-filter-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.dashboard-filter-card__actions select {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 1rem;
+  background: #fff;
+  color: var(--text-main);
+  font-weight: 800;
+}
+
+.dashboard-monthly-card {
+  overflow: hidden;
+}
+
+.dashboard-monthly-card__total {
+  display: grid;
+  gap: 0.15rem;
+  justify-items: end;
+  min-width: 160px;
+}
+
+.dashboard-monthly-card__total span {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dashboard-monthly-card__total strong {
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.dashboard-monthly-table {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.dashboard-monthly-table__head,
+.dashboard-monthly-table__row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.25fr) 0.75fr 0.85fr 0.85fr 0.85fr 0.9fr minmax(190px, 1.2fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.dashboard-monthly-table__head {
+  padding: 0 0.25rem;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dashboard-monthly-table__row {
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.92));
+}
+
+.dashboard-monthly-table__row span,
+.dashboard-monthly-table__row small {
+  color: var(--text-soft);
+  font-weight: 700;
+}
+
+.dashboard-monthly-table__row strong {
+  color: var(--text-main);
+}
+
+.dashboard-monthly-table__balance {
+  color: var(--primary) !important;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-monthly-table {
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .dashboard-monthly-table__head,
+  .dashboard-monthly-table__row {
+    min-width: 980px;
+  }
+}
+
+@media (max-width: 920px) {
+  .dashboard-filter-card,
+  .dashboard-filter-card__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-filter-card__actions .button,
+  .dashboard-filter-card__actions select {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dashboard-monthly-card__total {
+    justify-items: start;
+  }
+}

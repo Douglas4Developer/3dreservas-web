@@ -12,12 +12,28 @@ import { fetchWhatsappMessages } from '../../services/whatsapp.service'
 import type { DashboardSummary, Payment, PaymentOrder, Reservation, ReservationStatus } from '../../types/database'
 
 const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const fullMonthLabels = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+type DashboardPeriod = 'first-half' | 'second-half' | 'year'
+
+type SalesTotals = {
+  totalAmount: number
+  entryAmount: number
+  remainingAmount: number
+  confirmedCount: number
+  pendingCount: number
+  leadsCount: number
+  cancelledCount: number
+  reservedDays: number
+}
 
 function getMonthKey(dateString: string) {
   const date = new Date(`${dateString}T12:00:00`)
   return `${date.getFullYear()}-${date.getMonth()}`
 }
 
+function getYearFromDate(dateString: string) {
+  return new Date(`${dateString}T12:00:00`).getFullYear()
+}
 
 function getDaysUntil(dateString: string) {
   const today = new Date()
@@ -25,6 +41,59 @@ function getDaysUntil(dateString: string) {
   const target = new Date(`${dateString}T12:00:00`)
   target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function getReservationBalance(reservation: Reservation) {
+  if (typeof reservation.remaining_amount === 'number') return reservation.remaining_amount
+  const gross = reservation.total_amount ?? 0
+  const entry = reservation.entry_amount ?? 0
+  return Math.max(gross - entry, 0)
+}
+
+function makeMonthSummary(year: number, monthIndex: number, reservations: Reservation[]) {
+  const reservationsInMonth = reservations.filter((item) => getMonthKey(item.event_date) === `${year}-${monthIndex}`)
+  const confirmed = reservationsInMonth.filter((item) => item.status === 'reservado')
+  const pending = reservationsInMonth.filter((item) => item.status === 'aguardando_pagamento' || item.status === 'bloqueio_temporario')
+  const leads = reservationsInMonth.filter((item) => item.status === 'interesse_enviado')
+  const cancelled = reservationsInMonth.filter((item) => item.status === 'cancelado')
+  const totalDays = new Date(year, monthIndex + 1, 0).getDate()
+  const reservedDays = confirmed.reduce((total, item) => total + (item.days_count ?? 1), 0)
+  const totalAmount = confirmed.reduce((total, item) => total + (item.total_amount ?? 0), 0)
+  const entryAmount = confirmed.reduce((total, item) => total + (item.entry_amount ?? 0), 0)
+  const remainingAmount = confirmed.reduce((total, item) => total + getReservationBalance(item), 0)
+  const occupancy = Math.min(100, Math.round((reservedDays / totalDays) * 100))
+
+  return {
+    key: `${year}-${monthIndex}`,
+    label: `${monthLabels[monthIndex]} ${String(year).slice(2)}`,
+    fullLabel: `${fullMonthLabels[monthIndex]} de ${year}`,
+    totalDays,
+    reservedDays,
+    occupancy,
+    totalAmount,
+    entryAmount,
+    remainingAmount,
+    confirmedCount: confirmed.length,
+    pendingCount: pending.length,
+    leadsCount: leads.length,
+    cancelledCount: cancelled.length,
+  }
+}
+
+function sumSalesTotals(months: ReturnType<typeof makeMonthSummary>[]): SalesTotals {
+  return months.reduce(
+    (total, month) => ({
+      totalAmount: total.totalAmount + month.totalAmount,
+      entryAmount: total.entryAmount + month.entryAmount,
+      remainingAmount: total.remainingAmount + month.remainingAmount,
+      confirmedCount: total.confirmedCount + month.confirmedCount,
+      pendingCount: total.pendingCount + month.pendingCount,
+      leadsCount: total.leadsCount + month.leadsCount,
+      cancelledCount: total.cancelledCount + month.cancelledCount,
+      reservedDays: total.reservedDays + month.reservedDays,
+    }),
+    { totalAmount: 0, entryAmount: 0, remainingAmount: 0, confirmedCount: 0, pendingCount: 0, leadsCount: 0, cancelledCount: 0, reservedDays: 0 },
+  )
 }
 
 function statusLabel(status: ReservationStatus) {
@@ -39,11 +108,15 @@ function statusLabel(status: ReservationStatus) {
 }
 
 export default function DashboardPage() {
+  const currentYear = new Date().getFullYear()
+  const currentSemester: DashboardPeriod = new Date().getMonth() < 6 ? 'first-half' : 'second-half'
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [reservations, setReservations] = useState<Reservation[]>([])
   const [pendingPayments, setPendingPayments] = useState<Payment[]>([])
   const [pendingPaymentOrders, setPendingPaymentOrders] = useState<PaymentOrder[]>([])
   const [recentMessagesCount, setRecentMessagesCount] = useState(0)
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedPeriod, setSelectedPeriod] = useState<DashboardPeriod>(currentSemester)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -81,22 +154,36 @@ export default function DashboardPage() {
     [reservations],
   )
 
+  const availableYears = useMemo(() => {
+    const years = new Set<number>([currentYear])
+    orderedReservations.forEach((item) => years.add(getYearFromDate(item.event_date)))
+    return [...years].sort((a, b) => b - a)
+  }, [currentYear, orderedReservations])
+
   const futureReservations = useMemo(() => orderedReservations.filter((item) => getDaysUntil(item.event_date) >= 0), [orderedReservations])
   const futureReservedReservations = useMemo(() => futureReservations.filter((item) => item.status === 'reservado'), [futureReservations])
   const nextReservations = futureReservedReservations.slice(0, 5)
   const reservedReservations = orderedReservations.filter((item) => item.status === 'reservado')
   const totalUpcomingEvents = futureReservedReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
   const upcomingEntryAmount = futureReservedReservations.reduce((total, item) => total + (item.entry_amount ?? 0), 0)
-  const upcomingRemainingAmount = futureReservedReservations.reduce((total, item) => {
-    if (typeof item.remaining_amount === 'number') return total + item.remaining_amount
-    const gross = item.total_amount ?? 0
-    const entry = item.entry_amount ?? 0
-    return total + Math.max(gross - entry, 0)
-  }, 0)
+  const upcomingRemainingAmount = futureReservedReservations.reduce((total, item) => total + getReservationBalance(item), 0)
   const confirmedRevenue = reservedReservations.reduce((total, item) => total + (item.total_amount ?? 0), 0)
   const averageTicket = reservedReservations.length > 0 ? Math.round(confirmedRevenue / reservedReservations.length) : 0
-  const upcomingConfirmed = futureReservedReservations.length
-  const nextEvent = nextReservations[0] ?? null
+
+  const monthlySales = useMemo(
+    () => Array.from({ length: 12 }, (_, monthIndex) => makeMonthSummary(selectedYear, monthIndex, orderedReservations)),
+    [orderedReservations, selectedYear],
+  )
+
+  const visibleMonthlySales = useMemo(() => {
+    if (selectedPeriod === 'first-half') return monthlySales.slice(0, 6)
+    if (selectedPeriod === 'second-half') return monthlySales.slice(6, 12)
+    return monthlySales
+  }, [monthlySales, selectedPeriod])
+
+  const annualSalesTotals = useMemo(() => sumSalesTotals(monthlySales), [monthlySales])
+  const visibleSalesTotals = useMemo(() => sumSalesTotals(visibleMonthlySales), [visibleMonthlySales])
+  const periodLabel = selectedPeriod === 'first-half' ? '1º semestre' : selectedPeriod === 'second-half' ? '2º semestre' : 'Ano completo'
 
   const statusBreakdown = useMemo(() => {
     const statusOrder: ReservationStatus[] = ['reservado', 'aguardando_pagamento', 'bloqueio_temporario', 'interesse_enviado', 'cancelado']
@@ -107,27 +194,6 @@ export default function DashboardPage() {
 
     const max = Math.max(...entries.map((item) => item.count), 1)
     return entries.map((item) => ({ ...item, width: `${(item.count / max) * 100}%` }))
-  }, [orderedReservations])
-
-  const occupancyByMonth = useMemo(() => {
-    const months = Array.from({ length: 6 }, (_, index) => {
-      const base = new Date()
-      base.setDate(1)
-      base.setMonth(base.getMonth() + index)
-      return {
-        key: `${base.getFullYear()}-${base.getMonth()}`,
-        label: `${monthLabels[base.getMonth()]} ${String(base.getFullYear()).slice(2)}`,
-        totalDays: new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate(),
-      }
-    })
-
-    return months.map((month) => {
-      const reservationsInMonth = orderedReservations.filter((item) => getMonthKey(item.event_date) === month.key && item.status === 'reservado')
-      const reservedDays = reservationsInMonth.reduce((total, item) => total + (item.days_count ?? 1), 0)
-      const occupancy = Math.min(100, Math.round((reservedDays / month.totalDays) * 100))
-      const projectedRevenue = reservationsInMonth.reduce((total, item) => total + (item.total_amount ?? 0), 0)
-      return { ...month, reservedDays, occupancy, projectedRevenue }
-    })
   }, [orderedReservations])
 
   if (loading || !summary) {
@@ -152,21 +218,40 @@ export default function DashboardPage() {
         <StatCard label="Total próximos eventos" value={formatCurrency(totalUpcomingEvents)} hint="Somente reservas futuras confirmadas" />
         <StatCard label="Saldo a receber" value={formatCurrency(upcomingRemainingAmount)} hint={`Entradas já consideradas: ${formatCurrency(upcomingEntryAmount)}`} />
         <StatCard label="Ticket médio" value={formatCurrency(averageTicket)} hint="Reservas confirmadas" />
+        <StatCard label={`Vendas ${selectedYear}`} value={formatCurrency(annualSalesTotals.totalAmount)} hint={`${annualSalesTotals.confirmedCount} reserva(s) confirmada(s) no ano`} />
         <StatCard label="Ocupação" value={`${summary.occupancyRate}%`} hint={`Mensagens recentes: ${recentMessagesCount}`} />
       </div>
+
+      <section className="card dashboard-filter-card">
+        <div>
+          <span className="dashboard-kicker">Filtro financeiro</span>
+          <h3>Vendas por período</h3>
+          <p>Veja o ano completo ou quebre a análise de 6 em 6 meses, sem misturar reservas canceladas na receita.</p>
+        </div>
+        <div className="dashboard-filter-card__actions">
+          <select value={selectedYear} onChange={(event) => setSelectedYear(Number(event.target.value))} aria-label="Selecionar ano">
+            {availableYears.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+          <button className={`button ${selectedPeriod === 'first-half' ? 'button-primary' : 'button-ghost'}`} type="button" onClick={() => setSelectedPeriod('first-half')}>1º semestre</button>
+          <button className={`button ${selectedPeriod === 'second-half' ? 'button-primary' : 'button-ghost'}`} type="button" onClick={() => setSelectedPeriod('second-half')}>2º semestre</button>
+          <button className={`button ${selectedPeriod === 'year' ? 'button-primary' : 'button-ghost'}`} type="button" onClick={() => setSelectedPeriod('year')}>Ano completo</button>
+        </div>
+      </section>
 
       <section className="dashboard-airbnb-grid">
         <article className="card dashboard-spotlight">
           <div className="dashboard-spotlight__header">
             <div>
               <span className="dashboard-kicker">Painel visual de ocupação</span>
-              <h3>Como está a agenda dos próximos meses</h3>
+              <h3>Como está a agenda em {periodLabel.toLowerCase()}</h3>
             </div>
-            <div className="dashboard-spotlight__badge">{upcomingConfirmed} reservas futuras confirmadas</div>
+            <div className="dashboard-spotlight__badge">{visibleSalesTotals.confirmedCount} reserva(s) no período</div>
           </div>
 
           <div className="occupancy-bars">
-            {occupancyByMonth.map((item) => (
+            {visibleMonthlySales.map((item) => (
               <div key={item.key} className="occupancy-bars__item">
                 <div className="occupancy-bars__top">
                   <strong>{item.label}</strong>
@@ -177,7 +262,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="occupancy-bars__meta">
                   <span>{item.reservedDays} dia(s) ocupados</span>
-                  <strong>{formatCurrency(item.projectedRevenue)}</strong>
+                  <strong>{formatCurrency(item.totalAmount)}</strong>
                 </div>
               </div>
             ))}
@@ -187,27 +272,63 @@ export default function DashboardPage() {
         <article className="card dashboard-side-metrics">
           <div className="dashboard-side-metrics__grid">
             <div className="dashboard-mini-card">
-              <span>Total próximos eventos</span>
-              <strong>{formatCurrency(totalUpcomingEvents)}</strong>
-              <small>Valor bruto das reservas futuras confirmadas</small>
+              <span>Total no período</span>
+              <strong>{formatCurrency(visibleSalesTotals.totalAmount)}</strong>
+              <small>{periodLabel} de {selectedYear}, somente reservas confirmadas</small>
             </div>
             <div className="dashboard-mini-card">
-              <span>Saldo a receber</span>
-              <strong>{formatCurrency(upcomingRemainingAmount)}</strong>
-              <small>Somente o saldo restante dos próximos eventos</small>
+              <span>Saldo do período</span>
+              <strong>{formatCurrency(visibleSalesTotals.remainingAmount)}</strong>
+              <small>Valor restante separado da entrada/sinal</small>
             </div>
             <div className="dashboard-mini-card">
-              <span>Entradas previstas</span>
-              <strong>{formatCurrency(upcomingEntryAmount)}</strong>
-              <small>Parte já considerada antes do saldo final</small>
+              <span>Entradas do período</span>
+              <strong>{formatCurrency(visibleSalesTotals.entryAmount)}</strong>
+              <small>Sinal/entrada das reservas confirmadas</small>
             </div>
             <div className="dashboard-mini-card">
-              <span>Próximo evento</span>
-              <strong>{nextEvent ? formatDate(nextEvent.event_date) : 'Sem agenda'}</strong>
-              <small>{nextEvent ? nextEvent.customer_name : 'Nenhuma reserva futura'}</small>
+              <span>Total do ano</span>
+              <strong>{formatCurrency(annualSalesTotals.totalAmount)}</strong>
+              <small>{annualSalesTotals.confirmedCount} reserva(s), {annualSalesTotals.reservedDays} dia(s) ocupados</small>
             </div>
           </div>
         </article>
+      </section>
+
+      <section className="card dashboard-panel-card dashboard-monthly-card">
+        <div className="dashboard-panel-card__header">
+          <div>
+            <span className="dashboard-kicker">Venda mensal</span>
+            <h3>Resumo organizado por mês</h3>
+          </div>
+          <div className="dashboard-monthly-card__total">
+            <span>Total do ano</span>
+            <strong>{formatCurrency(annualSalesTotals.totalAmount)}</strong>
+          </div>
+        </div>
+
+        <div className="dashboard-monthly-table">
+          <div className="dashboard-monthly-table__head">
+            <span>Mês</span>
+            <span>Reservas</span>
+            <span>Total</span>
+            <span>Entrada</span>
+            <span>Saldo</span>
+            <span>Ocupação</span>
+            <span>Outros status</span>
+          </div>
+          {visibleMonthlySales.map((month) => (
+            <div key={month.key} className="dashboard-monthly-table__row">
+              <strong>{month.fullLabel}</strong>
+              <span>{month.confirmedCount} fechada(s)</span>
+              <span>{formatCurrency(month.totalAmount)}</span>
+              <span>{formatCurrency(month.entryAmount)}</span>
+              <span className="dashboard-monthly-table__balance">{formatCurrency(month.remainingAmount)}</span>
+              <span>{month.occupancy}% · {month.reservedDays} dia(s)</span>
+              <small>{month.pendingCount} pendente(s) · {month.leadsCount} interesse(s) · {month.cancelledCount} cancelada(s)</small>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="dashboard-airbnb-grid dashboard-airbnb-grid--two-columns">
@@ -249,7 +370,7 @@ export default function DashboardPage() {
               nextReservations.map((reservation) => {
                 const totalAmount = reservation.total_amount ?? 0
                 const entryAmount = reservation.entry_amount ?? 0
-                const remainingAmount = typeof reservation.remaining_amount === 'number' ? reservation.remaining_amount : Math.max(totalAmount - entryAmount, 0)
+                const remainingAmount = getReservationBalance(reservation)
 
                 return (
                   <div className="line-card line-card--elevated dashboard-event-card" key={reservation.id}>
