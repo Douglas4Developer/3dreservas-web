@@ -4,7 +4,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge'
 import { buildContractPreviewHtml } from '../../lib/contract-renderer'
 import { formatCurrency, formatDateRange, formatDateTime } from '../../lib/format'
 import { fetchReservationLookupByToken } from '../../services/reservations.service'
-import { registerPublicSignature } from '../../services/signatures.service'
+import { defaultLessorSignature, registerPublicSignature } from '../../services/signatures.service'
 import type { ReservationLookup } from '../../types/database'
 
 export default function ContractPage() {
@@ -244,17 +244,22 @@ export default function ContractPage() {
           <h2>Assinaturas</h2>
           <div className="stack-list">
             {lookup.signatures.map((signature) => {
-              const preview = typeof signature.evidence_json?.signature_data_url === 'string' ? signature.evidence_json.signature_data_url : null
+              const preview = typeof signature.evidence_json?.signature_data_url === 'string'
+                ? signature.evidence_json.signature_data_url
+                : signature.signer_role === 'admin'
+                  ? defaultLessorSignature.signature_data_url
+                  : null
+              const displayName = signature.signer_role === 'admin' ? defaultLessorSignature.signer_name : signature.signer_name
               return (
                 <div className="signature-card" key={signature.id}>
                   <div className="line-card">
                     <div>
-                      <strong>{signature.signer_name}</strong>
+                      <strong>{displayName}</strong>
                       <p>{formatDateTime(signature.signed_at)}</p>
                     </div>
-                    <span className="status-badge status-assinado">{signature.signer_role}</span>
+                    <span className="status-badge status-assinado">{signature.signer_role === 'admin' ? 'Locador' : 'Cliente'}</span>
                   </div>
-                  {preview ? <img className="signature-preview-image" src={preview} alt={`Assinatura de ${signature.signer_name}`} /> : null}
+                  {preview ? <img className="signature-preview-image" src={preview} alt={`Assinatura de ${displayName}`} /> : null}
                 </div>
               )
             })}

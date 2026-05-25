@@ -14,7 +14,7 @@ import {
 import { subscribeToTables } from '../../lib/realtime'
 import { deleteContract, fetchContracts, generateContract, getReservationLinks, updateContract } from '../../services/contracts.service'
 import { fetchReservations } from '../../services/reservations.service'
-import { fetchSignatures, registerAdminSignature } from '../../services/signatures.service'
+import { defaultLessorSignature, fetchSignatures, registerAdminSignature } from '../../services/signatures.service'
 import type { Contract, ContractClause, ContractTermsJson, Reservation, Signature } from '../../types/database'
 
 const emptyClause: ContractClause = { title: '', body: '' }
@@ -122,9 +122,10 @@ export default function ContractsPage() {
     try {
       await registerAdminSignature({
         contractId,
-        signer_name: 'Administrador 3Deventos',
+        signer_name: defaultLessorSignature.signer_name,
+        signature_data_url: defaultLessorSignature.signature_data_url,
       })
-      setSuccess('Assinatura do administrador registrada com sucesso.')
+      setSuccess('Rubrica do locador registrada com sucesso.')
       await loadData()
     } catch (serviceError) {
       setError(serviceError instanceof Error ? serviceError.message : 'Erro ao assinar contrato.')
@@ -408,7 +409,7 @@ export default function ContractsPage() {
                           ) : (
                             signatures.map((signature) => (
                               <span key={signature.id} className="table-helper">
-                                {signature.signer_role}: {formatDateTime(signature.signed_at)}
+                                {signature.signer_role === 'admin' ? 'Locador' : 'Cliente'}: {signature.signer_role === 'admin' ? defaultLessorSignature.signer_name : signature.signer_name} - {formatDateTime(signature.signed_at)}
                               </span>
                             ))
                           )}
@@ -434,7 +435,7 @@ export default function ContractsPage() {
                               onClick={() => void handleAdminSignature(contract.id)}
                               disabled={signingFor === contract.id}
                             >
-                              {signingFor === contract.id ? 'Assinando...' : 'Assinar admin'}
+                              {signingFor === contract.id ? 'Assinando...' : 'Assinar locador'}
                             </button>
                           ) : null}
                           <button className="button button-secondary" type="button" onClick={() => void handleCopyContractLink(contract.reservation_id)}>
