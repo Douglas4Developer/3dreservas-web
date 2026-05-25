@@ -244,10 +244,10 @@ export default function ContractPage() {
           <h2>Assinaturas</h2>
           <div className="stack-list">
             {lookup.signatures.map((signature) => {
-              const preview = typeof signature.evidence_json?.signature_data_url === 'string'
-                ? signature.evidence_json.signature_data_url
-                : signature.signer_role === 'admin'
-                  ? defaultLessorSignature.signature_data_url
+              const preview = signature.signer_role === 'admin'
+                ? defaultLessorSignature.signature_data_url
+                : typeof signature.evidence_json?.signature_data_url === 'string'
+                  ? signature.evidence_json.signature_data_url
                   : null
               const displayName = signature.signer_role === 'admin' ? defaultLessorSignature.signer_name : signature.signer_name
               return (

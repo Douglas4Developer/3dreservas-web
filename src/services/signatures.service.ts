@@ -8,9 +8,27 @@ function buildDouglasRubricDataUrl() {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="640" height="220" viewBox="0 0 640 220">
       <rect width="640" height="220" fill="white"/>
-      <path d="M86 145 C118 92, 158 54, 214 42 C177 88, 149 126, 132 176 C178 137, 230 103, 289 92 C260 123, 238 148, 226 174 C278 135, 329 112, 390 110" fill="none" stroke="#111827" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M108 174 C178 184, 259 186, 383 172" fill="none" stroke="#111827" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
-      <text x="88" y="205" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#111827">Douglas Soares de Souza Ferreira</text>
+      <text
+        x="70"
+        y="118"
+        font-family="Brush Script MT, Segoe Script, Lucida Handwriting, cursive"
+        font-size="96"
+        font-style="italic"
+        font-weight="700"
+        letter-spacing="2"
+        fill="#0f172a"
+        transform="rotate(-6 70 118)"
+      >DSSF</text>
+      <path d="M82 136 C168 150, 258 150, 420 132" fill="none" stroke="#0f172a" stroke-width="5" stroke-linecap="round" opacity="0.85"/>
+      <text
+        x="86"
+        y="165"
+        font-family="Brush Script MT, Segoe Script, Lucida Handwriting, cursive"
+        font-size="40"
+        font-style="italic"
+        fill="#1f2937"
+      >Douglas</text>
+      <text x="86" y="203" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#334155">Douglas Soares de Souza Ferreira</text>
     </svg>
   `.trim()
 
