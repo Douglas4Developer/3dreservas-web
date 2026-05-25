@@ -40,7 +40,10 @@ export async function registerPublicSignature(input: CreateSignatureInput) {
   }
 
   return invokeEdgeFunction<{ signature: Signature }>('register-signature', {
-    body: input,
+    body: {
+      ...input,
+      signer_role: 'client',
+    },
     requiresAuth: false,
   })
 }

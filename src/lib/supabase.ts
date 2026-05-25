@@ -127,10 +127,15 @@ async function performEdgeFunctionRequest<TResponse = unknown>(
   const body = buildRequestBody(options?.body)
 
   headers.set('apikey', supabaseAnonKey ?? '')
-  if (session?.access_token) {
-    headers.set('Authorization', `Bearer ${session.access_token}`)
-  } else {
-    headers.delete('Authorization')
+
+  // Supabase Edge Functions normally validate a JWT before the code runs.
+  // Public flows, like the client signing a contract through a WhatsApp link,
+  // do not have an admin session. In that case we still need to send the anon
+  // key as a Bearer token, otherwise the request can fail before reaching the
+  // register-signature function with: Missing/Invalid JWT.
+  const bearerToken = session?.access_token ?? supabaseAnonKey
+  if (bearerToken) {
+    headers.set('Authorization', `Bearer ${bearerToken}`)
   }
 
   if (!(body instanceof FormData) && !headers.has('Content-Type')) {
