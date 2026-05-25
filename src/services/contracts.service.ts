@@ -1,3 +1,4 @@
+import { buildContractTermsHtmlFragment, buildContractTermsPlainText, cloneDefaultContractTerms } from '../lib/contract-defaults'
 import { mockContracts } from '../lib/mock'
 import { appUrl, invokeEdgeFunction, isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { Contract, ContractTermsJson } from '../types/database'
@@ -10,7 +11,7 @@ export async function fetchContracts(): Promise<Contract[]> {
   return (data ?? []) as Contract[]
 }
 
-export async function generateContract(reservationId: string) {
+export async function generateContract(reservationId: string, contractTermsJson: ContractTermsJson = cloneDefaultContractTerms()) {
   if (!isSupabaseConfigured || !supabase) {
     return {
       contract: mockContracts[0],
@@ -18,8 +19,18 @@ export async function generateContract(reservationId: string) {
     }
   }
 
+  const printableContractHtml = buildContractTermsHtmlFragment(contractTermsJson)
+  const printableContractText = buildContractTermsPlainText(contractTermsJson)
+
   return invokeEdgeFunction<{ contract: Contract; previewUrl?: string; viewUrl?: string; signUrl?: string }>('generate-contract', {
-    body: { reservationId },
+    body: {
+      reservationId,
+      contractTermsJson,
+      renderMode: 'readable_clauses',
+      printableContractHtml,
+      printableContractText,
+      forceReadableLayout: true,
+    },
   })
 }
 

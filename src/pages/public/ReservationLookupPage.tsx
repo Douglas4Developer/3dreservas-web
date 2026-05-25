@@ -240,13 +240,14 @@ export default function ReservationLookupPage() {
                 </div>
                 <StatusBadge status={lookup.contract.status} />
               </div>
+              <a className="button button-secondary" href={`/contrato/${token}`}>
+                Visualizar contrato formatado
+              </a>
               {lookup.contract.file_path ? (
                 <a className="button button-secondary" href={lookup.contract.file_path} target="_blank" rel="noreferrer">
-                  Abrir contrato
+                  Abrir PDF antigo
                 </a>
-              ) : (
-                <p>O arquivo final ainda não foi publicado.</p>
-              )}
+              ) : null}
             </div>
           ) : (
             <p>Contrato ainda não gerado para esta reserva.</p>

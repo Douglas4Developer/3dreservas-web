@@ -3788,3 +3788,331 @@ textarea {
     justify-items: start;
   }
 }
+
+/* Contrato público: leitura organizada das cláusulas no link de contrato e no PDF via impressão */
+.contract-preview {
+  overflow: visible;
+  padding: 1.25rem;
+  border-radius: 18px;
+  background: #f8fafd;
+  border: 1px solid var(--border);
+}
+
+.contract-print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.contract-document {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  color: #172033;
+  font-size: 1rem;
+  line-height: 1.72;
+}
+
+.contract-document h1,
+.contract-document h2,
+.contract-document h3,
+.contract-document p {
+  margin-top: 0;
+}
+
+.contract-document__header {
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.contract-document__eyebrow {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #1565d8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.contract-document__header h1 {
+  margin-bottom: 0.8rem;
+  font-size: clamp(1.35rem, 2vw, 1.85rem);
+  line-height: 1.25;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+
+.contract-document__parties,
+.contract-document__summary,
+.contract-document__clause,
+.contract-document__footer {
+  padding: 1.1rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 16px;
+  background: #ffffff;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.contract-document__parties h2,
+.contract-document__summary h2,
+.contract-document__clauses > h2,
+.contract-document__clause h3 {
+  margin-bottom: 0.8rem;
+  color: #0f172a;
+}
+
+.contract-document__parties h2,
+.contract-document__summary h2,
+.contract-document__clauses > h2 {
+  font-size: 1.12rem;
+}
+
+.contract-document__party-card {
+  padding: 0.85rem;
+  border-radius: 12px;
+  background: #f8fafd;
+}
+
+.contract-document__party-card + .contract-document__party-card {
+  margin-top: 0.75rem;
+}
+
+.contract-document__party-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #0f172a;
+}
+
+.contract-document__clause h3 {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  font-size: 1rem;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.contract-document__clause h3 span {
+  flex: 0 0 auto;
+  min-width: 2.1rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(21, 101, 216, 0.1);
+  color: #1565d8;
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.contract-document__clause-body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.contract-document__paragraph {
+  margin-bottom: 0;
+  color: #26354f;
+  text-align: justify;
+  overflow-wrap: anywhere;
+}
+
+.contract-document__clause p:last-child,
+.contract-document__parties p:last-child,
+.contract-document__summary p:last-child,
+.contract-document__footer p:last-child {
+  margin-bottom: 0;
+}
+
+.contract-document__summary-grid {
+  display: grid;
+  gap: 0.65rem 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.contract-document__summary-grid span {
+  display: block;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(21, 101, 216, 0.06);
+  color: #26354f;
+}
+
+.contract-document__summary-grid span strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #0f172a;
+}
+
+.contract-document__signature-lines {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 3rem;
+}
+
+.contract-document__signature-lines div {
+  text-align: center;
+}
+
+.contract-document__signature-lines span {
+  display: block;
+  height: 1px;
+  margin-bottom: 0.7rem;
+  background: #0f172a;
+}
+
+.contract-document__signature-lines small {
+  display: block;
+  color: #60708f;
+}
+
+@media (max-width: 760px) {
+  .contract-document {
+    font-size: 0.94rem;
+    line-height: 1.65;
+  }
+
+  .contract-document__summary-grid,
+  .contract-document__signature-lines {
+    grid-template-columns: 1fr;
+  }
+
+  .contract-document__parties,
+  .contract-document__summary,
+  .contract-document__clause,
+  .contract-document__footer,
+  .contract-document__header {
+    padding: 0.9rem;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: auto;
+    background: #ffffff !important;
+  }
+
+  body {
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .public-header,
+  .public-footer,
+  .contract-print-actions,
+  .contract-page-aside,
+  .contract-page-summary,
+  .toast,
+  .status-badge,
+  .button {
+    display: none !important;
+  }
+
+  .section-block,
+  .container,
+  .page-grid,
+  .page-grid--public,
+  .card,
+  .details-card,
+  .contract-preview {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  .contract-document {
+    max-width: none !important;
+    margin: 0 !important;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.48;
+    color: #111827;
+  }
+
+  .contract-document__header,
+  .contract-document__parties,
+  .contract-document__summary,
+  .contract-document__clause,
+  .contract-document__footer {
+    padding: 0 !important;
+    margin: 0 0 8mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  .contract-document__header {
+    text-align: center;
+    border-bottom: 1px solid #cbd5e1 !important;
+    padding-bottom: 5mm !important;
+  }
+
+  .contract-document__header h1 {
+    font-size: 14pt;
+  }
+
+  .contract-document__parties h2,
+  .contract-document__summary h2,
+  .contract-document__clauses > h2,
+  .contract-document__clause h3 {
+    font-size: 11.5pt;
+    margin-bottom: 3mm;
+  }
+
+  .contract-document__party-card,
+  .contract-document__summary-grid span {
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .contract-document__summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2.5mm 6mm;
+  }
+
+  .contract-document__clause {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .contract-document__clause h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .contract-document__paragraph {
+    margin: 0 0 2.5mm !important;
+    text-align: justify;
+    color: #111827;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .contract-document__signature-lines {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+

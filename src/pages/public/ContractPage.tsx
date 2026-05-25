@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { buildContractPreviewHtml } from '../../lib/contract-renderer'
 import { formatCurrency, formatDateRange, formatDateTime } from '../../lib/format'
 import { fetchReservationLookupByToken } from '../../services/reservations.service'
 import { registerPublicSignature } from '../../services/signatures.service'
@@ -71,6 +72,8 @@ export default function ContractPage() {
     () => lookup?.signatures.find((item) => item.signer_role === 'client') ?? null,
     [lookup],
   )
+
+  const contractPreviewHtml = useMemo(() => (lookup ? buildContractPreviewHtml(lookup) : ''), [lookup])
 
   function getPoint(event: ReactPointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current
@@ -189,7 +192,7 @@ export default function ContractPage() {
     <section className="section-block">
       <div className="container page-grid page-grid--public">
         <article className="card details-card">
-          <div className="line-card">
+          <div className="line-card contract-page-summary">
             <div>
               <h1>Contrato da reserva</h1>
               <p>
@@ -200,13 +203,22 @@ export default function ContractPage() {
             {lookup.contract ? <StatusBadge status={lookup.contract.status} /> : null}
           </div>
 
+          {lookup.contract ? (
+            <div className="contract-print-actions">
+              <button className="button" type="button" onClick={() => window.print()}>
+                Salvar/baixar PDF legível
+              </button>
+              {lookup.contract.file_path ? (
+                <a className="button button-secondary" href={lookup.contract.file_path} target="_blank" rel="noreferrer">
+                  Abrir PDF antigo
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="contract-preview">
-            {lookup.contract?.html_content ? (
-              <div dangerouslySetInnerHTML={{ __html: lookup.contract.html_content }} />
-            ) : lookup.contract?.final_file_path || lookup.contract?.file_path ? (
-              <a className="button button-secondary" href={lookup.contract.final_file_path ?? lookup.contract.file_path ?? '#'} target="_blank" rel="noreferrer">
-                Abrir versão publicada do contrato
-              </a>
+            {lookup.contract ? (
+              <div dangerouslySetInnerHTML={{ __html: contractPreviewHtml }} />
             ) : (
               <p>O conteúdo do contrato ainda está sendo preparado.</p>
             )}
@@ -228,7 +240,7 @@ export default function ContractPage() {
           ) : null}
         </article>
 
-        <aside className="card details-card">
+        <aside className="card details-card contract-page-aside">
           <h2>Assinaturas</h2>
           <div className="stack-list">
             {lookup.signatures.map((signature) => {

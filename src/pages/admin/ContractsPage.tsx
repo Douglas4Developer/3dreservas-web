@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatDate, formatDateTime } from '../../lib/format'
+import {
+  DEFAULT_CONTRACT_INTRO,
+  DEFAULT_CONTRACT_TITLE,
+  DEFAULT_FORUM_CITY,
+  DEFAULT_LESSOR_ADDRESS,
+  DEFAULT_LESSOR_DOCUMENT,
+  DEFAULT_LESSOR_NAME,
+  cloneDefaultContractTerms,
+} from '../../lib/contract-defaults'
 import { subscribeToTables } from '../../lib/realtime'
 import { deleteContract, fetchContracts, generateContract, getReservationLinks, updateContract } from '../../services/contracts.service'
 import { fetchReservations } from '../../services/reservations.service'
@@ -11,20 +20,22 @@ import type { Contract, ContractClause, ContractTermsJson, Reservation, Signatur
 const emptyClause: ContractClause = { title: '', body: '' }
 
 function normalizeContractTerms(contract?: Contract | null) {
-  const terms = contract?.contract_terms_json ?? {}
+  const defaultTerms = cloneDefaultContractTerms()
+  const terms = contract?.contract_terms_json ?? defaultTerms
+  const hasSavedCustomClauses = Array.isArray(terms.custom_clauses) && terms.custom_clauses.length > 0
+
   return {
-    lessor_name: contract?.lessor_name ?? 'Douglas Soares de Souza Ferreira',
-    lessor_document: contract?.lessor_document ?? '708.321.121-35',
-    lessor_address: contract?.lessor_address ?? 'Estrada 114 QD3 LT 13, Chácara São Joaquim, Goiânia - GO',
-    forum_city: contract?.forum_city ?? 'Goiânia - GO',
+    lessor_name: contract?.lessor_name ?? DEFAULT_LESSOR_NAME,
+    lessor_document: contract?.lessor_document ?? DEFAULT_LESSOR_DOCUMENT,
+    lessor_address: contract?.lessor_address ?? DEFAULT_LESSOR_ADDRESS,
+    forum_city: contract?.forum_city ?? DEFAULT_FORUM_CITY,
     logo_url: terms.logo_url ?? '',
-    contract_title: terms.contract_title ?? '',
-    intro_text: terms.intro_text ?? '',
-    show_default_clauses: terms.show_default_clauses !== false,
-    custom_clauses:
-      Array.isArray(terms.custom_clauses) && terms.custom_clauses.length > 0
-        ? terms.custom_clauses.map((item) => ({ title: item.title ?? '', body: item.body ?? '' }))
-        : [{ ...emptyClause }],
+    contract_title: terms.contract_title ?? DEFAULT_CONTRACT_TITLE,
+    intro_text: terms.intro_text ?? DEFAULT_CONTRACT_INTRO,
+    show_default_clauses: terms.show_default_clauses ?? false,
+    custom_clauses: hasSavedCustomClauses
+      ? terms.custom_clauses!.map((item) => ({ title: item.title ?? '', body: item.body ?? '' }))
+      : defaultTerms.custom_clauses?.map((item) => ({ ...item })) ?? [{ ...emptyClause }],
   }
 }
 
@@ -93,7 +104,7 @@ export default function ContractsPage() {
     setSuccess(null)
 
     try {
-      const result = await generateContract(reservationId)
+      const result = await generateContract(reservationId, cloneDefaultContractTerms())
       setSuccess(result.previewUrl ? `Contrato gerado. Prévia/PDF: ${result.previewUrl}` : 'Contrato gerado com sucesso.')
       await loadData()
     } catch (serviceError) {
@@ -231,7 +242,7 @@ export default function ContractsPage() {
         contract_terms_json: contractTermsJson,
       })
 
-      await generateContract(selectedContract.reservation_id)
+      await generateContract(selectedContract.reservation_id, contractTermsJson)
       setSuccess('Modelo do contrato salvo e regenerado com sucesso.')
       await loadData()
     } catch (serviceError) {
@@ -251,7 +262,7 @@ export default function ContractsPage() {
       <div className="dashboard-grid dashboard-airbnb-grid dashboard-airbnb-grid--two-columns">
         <article className="card form-card">
           <h3>Modelador do contrato</h3>
-          <p>Selecione um contrato da lista para personalizar logo, dados do locador e cláusulas adicionais.</p>
+          <p>Selecione um contrato da lista para personalizar logo, dados do locador e as cláusulas padrão que serão usadas nos novos contratos.</p>
 
           {!selectedContract ? (
             <p>Gere ou selecione um contrato para começar.</p>
@@ -310,8 +321,8 @@ export default function ContractsPage() {
 
               <label className="line-card" style={{ alignItems: 'center' }}>
                 <span>
-                  <strong>Manter cláusulas padrão</strong>
-                  <p>Desative se quiser trabalhar apenas com cláusulas personalizadas.</p>
+                  <strong>Usar cláusulas antigas do sistema</strong>
+                  <p>Mantenha desativado para usar o modelo padrão da Isabelli como base dos contratos novos.</p>
                 </span>
                 <input
                   type="checkbox"
@@ -323,8 +334,8 @@ export default function ContractsPage() {
               <div className="stack-list">
                 <div className="line-card">
                   <div>
-                    <strong>Cláusulas extras</strong>
-                    <p>Adicione quantas cláusulas quiser ao contrato.</p>
+                    <strong>Cláusulas do contrato</strong>
+                    <p>Modelo padrão baseado no contrato da Isabelli. Você pode editar, remover ou adicionar cláusulas.</p>
                   </div>
                   <button className="button button-secondary" type="button" onClick={addClause}>
                     Adicionar cláusula
@@ -435,9 +446,14 @@ export default function ContractsPage() {
                           <button className="button button-secondary" type="button" onClick={() => void handleShareContract(contract.reservation_id)}>
                             Enviar no WhatsApp
                           </button>
+                          {reservation?.public_link_token ? (
+                            <a className="button button-secondary" href={`/contrato/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
+                              Abrir contrato formatado
+                            </a>
+                          ) : null}
                           {contract.final_file_path || contract.file_path ? (
                             <a className="button button-secondary" href={contract.final_file_path ?? contract.file_path ?? '#'} target="_blank" rel="noreferrer">
-                              Abrir contrato
+                              PDF antigo
                             </a>
                           ) : (
                             <span className="table-helper">Sem arquivo</span>
