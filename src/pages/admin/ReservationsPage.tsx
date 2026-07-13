@@ -64,6 +64,10 @@ export default function ReservationsPage() {
   const [lockedReservationIds, setLockedReservationIds] = useState<string[]>([])
   const [deletingReservationId, setDeletingReservationId] = useState<string | null>(null)
   const [form, setForm] = useState(initialForm)
+  const [reservationSearch, setReservationSearch] = useState('')
+  const [reservationStatusFilter, setReservationStatusFilter] = useState<'all' | ReservationStatus>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(6)
   const previousPaymentOrdersRef = useRef<Record<string, PaymentOrderStatus>>({})
 
   async function loadData() {
@@ -449,6 +453,61 @@ export default function ReservationsPage() {
     return dailyRate > 0 ? dailyRate * daysCount : null
   }, [form.daily_rate, form.days_count])
 
+  const filteredReservations = useMemo(() => {
+    const normalizedSearch = reservationSearch.trim().toLocaleLowerCase('pt-BR')
+
+    return reservations.filter((reservation) => {
+      const matchesStatus = reservationStatusFilter === 'all' || reservation.status === reservationStatusFilter
+
+      if (!matchesStatus) return false
+      if (!normalizedSearch) return true
+
+      const searchableContent = [
+        reservation.customer_name,
+        reservation.customer_phone,
+        reservation.customer_email,
+        reservation.customer_document,
+        reservation.event_type,
+        reservation.event_date,
+        reservation.end_date,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLocaleLowerCase('pt-BR')
+
+      return searchableContent.includes(normalizedSearch)
+    })
+  }, [reservationSearch, reservationStatusFilter, reservations])
+
+  const totalPages = Math.max(Math.ceil(filteredReservations.length / itemsPerPage), 1)
+  const pageStartIndex = (currentPage - 1) * itemsPerPage
+  const paginatedReservations = filteredReservations.slice(pageStartIndex, pageStartIndex + itemsPerPage)
+  const firstVisibleReservation = filteredReservations.length === 0 ? 0 : pageStartIndex + 1
+  const lastVisibleReservation = Math.min(pageStartIndex + itemsPerPage, filteredReservations.length)
+
+  const paginationItems = useMemo(() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1)
+
+    const pages: Array<number | 'ellipsis-start' | 'ellipsis-end'> = [1]
+    const start = Math.max(2, currentPage - 1)
+    const end = Math.min(totalPages - 1, currentPage + 1)
+
+    if (start > 2) pages.push('ellipsis-start')
+    for (let page = start; page <= end; page += 1) pages.push(page)
+    if (end < totalPages - 1) pages.push('ellipsis-end')
+    pages.push(totalPages)
+
+    return pages
+  }, [currentPage, totalPages])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [itemsPerPage, reservationSearch, reservationStatusFilter])
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages))
+  }, [totalPages])
+
   return (
     <div className="stack-lg">
       <PageHeader
@@ -621,121 +680,245 @@ export default function ReservationsPage() {
         </article>
       </div>
 
-      <article className="card table-card">
-        <h3>Agenda operacional</h3>
+      <article className="card table-card reservations-list-card">
+        <div className="reservations-list-header">
+          <div>
+            <span className="eyebrow reservations-list-eyebrow">Agenda operacional</span>
+            <h3>Reservas cadastradas</h3>
+            <p>{reservations.length} reserva(s) no total. Use os filtros para localizar um cliente rapidamente.</p>
+          </div>
+          {!loading && reservations.length > 0 ? (
+            <div className="reservations-list-count" aria-label="Quantidade de reservas filtradas">
+              <strong>{filteredReservations.length}</strong>
+              <span>resultado(s)</span>
+            </div>
+          ) : null}
+        </div>
+
+        {!loading && reservations.length > 0 ? (
+          <div className="reservations-toolbar">
+            <label className="reservations-search-field">
+              <span>Buscar reserva</span>
+              <input
+                type="search"
+                value={reservationSearch}
+                onChange={(event) => setReservationSearch(event.target.value)}
+                placeholder="Nome, telefone, e-mail, CPF ou data"
+              />
+            </label>
+            <label>
+              <span>Status</span>
+              <select
+                value={reservationStatusFilter}
+                onChange={(event) => setReservationStatusFilter(event.target.value as 'all' | ReservationStatus)}
+              >
+                <option value="all">Todos os status</option>
+                {reservationStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Por página</span>
+              <select value={itemsPerPage} onChange={(event) => setItemsPerPage(Number(event.target.value))}>
+                <option value={6}>6 reservas</option>
+                <option value={10}>10 reservas</option>
+                <option value={20}>20 reservas</option>
+              </select>
+            </label>
+          </div>
+        ) : null}
+
         {loading ? (
           <p>Carregando reservas...</p>
         ) : reservations.length === 0 ? (
           <p>Nenhuma reserva cadastrada.</p>
+        ) : filteredReservations.length === 0 ? (
+          <div className="reservations-empty-state">
+            <strong>Nenhuma reserva encontrada</strong>
+            <p>Altere a busca ou o filtro de status para visualizar outros resultados.</p>
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => {
+                setReservationSearch('')
+                setReservationStatusFilter('all')
+              }}
+            >
+              Limpar filtros
+            </button>
+          </div>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Período</th>
-                <th>Financeiro</th>
-                <th>Status</th>
-                <th>Checkout ativo</th>
-                <th>Ação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reservations.map((reservation) => {
-                const paymentOrder = paymentOrdersMap[reservation.id]
-                const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
-                return (
-                  <tr key={reservation.id}>
-                    <td data-label="Cliente">
-                      <strong>{reservation.customer_name}</strong>
-                      <div className="table-helper">{reservation.customer_phone}</div>
-                      <div className="table-helper">{reservation.customer_email ?? 'Sem e-mail'}</div>
-                    </td>
-                    <td data-label="Período">
-                      <strong>{formatDateRange(reservation.event_date, reservation.end_date)}</strong>
-                      <div className="table-helper">{describeReservationDays(reservation.event_date, reservation.end_date, reservation.days_count)}</div>
-                      <div className="table-helper">Diária: {formatCurrency(reservation.daily_rate)}</div>
-                      {lockedReservationIds.includes(reservation.id) ? <div className="table-helper">Período travado por assinatura</div> : null}
-                    </td>
-                    <td data-label="Financeiro">
-                      <div className="stack-list compact-stack">
-                        <span>Total: {formatCurrency(reservation.total_amount)}</span>
-                        <span>Entrada: {formatCurrency(reservation.entry_amount)}</span>
-                        <span>Saldo: {formatCurrency(reservation.remaining_amount)}</span>
-                      </div>
-                    </td>
-                    <td data-label="Status">
-                      <StatusBadge status={reservation.status} />
-                    </td>
-                    <td data-label="Checkout ativo">
-                      {paymentOrder ? (
-                        <div className="stack-list compact-stack">
-                          <StatusBadge status={paymentOrder.status} />
-                          <span className="table-helper">
-                            Tipo: {paymentOrder.checkout_type === 'pix' ? 'Pix' : paymentOrder.checkout_type === 'card' ? 'Cartão' : 'Pix ou cartão'}
-                          </span>
-                          <span className="table-helper">Expira em {formatCountdown(paymentOrder.expires_at)}</span>
-                        </div>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
-                    <td data-label="Ações">
-                      <div className="table-actions">
-                        <button className="button button-secondary" type="button" onClick={() => fillFormFromReservation(reservation)}>
-                          Editar
-                        </button>
-                        <button className="button button-secondary" type="button" onClick={() => void handleCreateAddendum(reservation)}>
-                          Gerar aditivo
-                        </button>
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          onClick={() => void handleConfirmManualPayment(reservation)}
-                          disabled={confirmingManualFor === reservation.id || !amount}
-                        >
-                          {confirmingManualFor === reservation.id ? 'Confirmando...' : 'Confirmar entrada manual'}
-                        </button>
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          onClick={() => void handleCreatePixPayment(reservation)}
-                          disabled={creatingPaymentFor === `${reservation.id}-pix` || !amount}
-                        >
-                          {creatingPaymentFor === `${reservation.id}-pix` ? 'Gerando Pix...' : 'Gerar Pix'}
-                        </button>
-                        <button
-                          className="button button-secondary"
-                          type="button"
-                          onClick={() => void handleCreateCardCheckout(reservation)}
-                          disabled={creatingPaymentFor === `${reservation.id}-card` || !amount}
-                        >
-                          {creatingPaymentFor === `${reservation.id}-card` ? 'Gerando cartão...' : 'Gerar Cartão'}
-                        </button>
-                        <a className="button button-secondary" href={`/minha-reserva/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
-                          Abrir reserva
-                        </a>
-                        <button className="button button-secondary" type="button" onClick={() => void handleCopyReservationLink(reservation.id)}>
-                          Copiar reserva
-                        </button>
-                        <button className="button button-secondary" type="button" onClick={() => void handleShareReservationLink(reservation.id)}>
-                          Enviar reserva
-                        </button>
-                        <button className="button button-secondary" type="button" onClick={() => void handleCopyContractLink(reservation.id)}>
-                          Copiar contrato
-                        </button>
-                        <button className="button button-secondary" type="button" onClick={() => void handleShareContractLink(reservation.id)}>
-                          Enviar contrato
-                        </button>
-                        <button className="button button-secondary" type="button" onClick={() => void handleDeleteReservation(reservation.id)} disabled={deletingReservationId === reservation.id}>
-                          {deletingReservationId === reservation.id ? 'Excluindo...' : 'Excluir reserva'}
-                        </button>
-                      </div>
-                    </td>
+          <>
+            <div className="reservations-table-scroll">
+              <table className="reservations-table">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Período</th>
+                    <th>Financeiro</th>
+                    <th>Status</th>
+                    <th>Checkout ativo</th>
+                    <th>Ações</th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {paginatedReservations.map((reservation) => {
+                    const paymentOrder = paymentOrdersMap[reservation.id]
+                    const amount = reservation.entry_amount ?? reservation.total_amount ?? 0
+                    return (
+                      <tr key={reservation.id}>
+                        <td data-label="Cliente">
+                          <strong>{reservation.customer_name}</strong>
+                          <div className="table-helper">{reservation.customer_phone}</div>
+                          <div className="table-helper">{reservation.customer_email ?? 'Sem e-mail'}</div>
+                        </td>
+                        <td data-label="Período">
+                          <strong>{formatDateRange(reservation.event_date, reservation.end_date)}</strong>
+                          <div className="table-helper">{describeReservationDays(reservation.event_date, reservation.end_date, reservation.days_count)}</div>
+                          <div className="table-helper">Diária: {formatCurrency(reservation.daily_rate)}</div>
+                          {lockedReservationIds.includes(reservation.id) ? <div className="table-helper reservations-locked-text">Período travado por assinatura</div> : null}
+                        </td>
+                        <td data-label="Financeiro">
+                          <div className="stack-list compact-stack reservations-financial-values">
+                            <span><small>Total</small>{formatCurrency(reservation.total_amount)}</span>
+                            <span><small>Entrada</small>{formatCurrency(reservation.entry_amount)}</span>
+                            <span><small>Saldo</small>{formatCurrency(reservation.remaining_amount)}</span>
+                          </div>
+                        </td>
+                        <td data-label="Status">
+                          <StatusBadge status={reservation.status} />
+                        </td>
+                        <td data-label="Checkout ativo">
+                          {paymentOrder ? (
+                            <div className="stack-list compact-stack">
+                              <StatusBadge status={paymentOrder.status} />
+                              <span className="table-helper">
+                                Tipo: {paymentOrder.checkout_type === 'pix' ? 'Pix' : paymentOrder.checkout_type === 'card' ? 'Cartão' : 'Pix ou cartão'}
+                              </span>
+                              <span className="table-helper">Expira em {formatCountdown(paymentOrder.expires_at)}</span>
+                            </div>
+                          ) : (
+                            <span className="reservations-no-checkout">Sem checkout</span>
+                          )}
+                        </td>
+                        <td data-label="Ações" className="reservations-actions-cell">
+                          <div className="reservation-primary-actions">
+                            <button className="button button-secondary" type="button" onClick={() => fillFormFromReservation(reservation)}>
+                              Editar
+                            </button>
+                            <details className="reservation-actions-menu">
+                              <summary className="button button-secondary reservation-actions-trigger">
+                                Mais ações <span aria-hidden="true">⌄</span>
+                              </summary>
+                              <div className="reservation-actions-panel">
+                                <span className="reservation-actions-group-title">Reserva e pagamento</span>
+                                <button className="button button-secondary" type="button" onClick={() => void handleCreateAddendum(reservation)}>
+                                  Gerar aditivo
+                                </button>
+                                <button
+                                  className="button button-secondary"
+                                  type="button"
+                                  onClick={() => void handleConfirmManualPayment(reservation)}
+                                  disabled={confirmingManualFor === reservation.id || !amount}
+                                >
+                                  {confirmingManualFor === reservation.id ? 'Confirmando...' : 'Confirmar entrada manual'}
+                                </button>
+                                <button
+                                  className="button button-secondary"
+                                  type="button"
+                                  onClick={() => void handleCreatePixPayment(reservation)}
+                                  disabled={creatingPaymentFor === `${reservation.id}-pix` || !amount}
+                                >
+                                  {creatingPaymentFor === `${reservation.id}-pix` ? 'Gerando Pix...' : 'Gerar Pix'}
+                                </button>
+                                <button
+                                  className="button button-secondary"
+                                  type="button"
+                                  onClick={() => void handleCreateCardCheckout(reservation)}
+                                  disabled={creatingPaymentFor === `${reservation.id}-card` || !amount}
+                                >
+                                  {creatingPaymentFor === `${reservation.id}-card` ? 'Gerando cartão...' : 'Gerar Cartão'}
+                                </button>
+
+                                <span className="reservation-actions-group-title">Links</span>
+                                <a className="button button-secondary" href={`/minha-reserva/${reservation.public_link_token}`} target="_blank" rel="noreferrer">
+                                  Abrir reserva
+                                </a>
+                                <button className="button button-secondary" type="button" onClick={() => void handleCopyReservationLink(reservation.id)}>
+                                  Copiar reserva
+                                </button>
+                                <button className="button button-secondary" type="button" onClick={() => void handleShareReservationLink(reservation.id)}>
+                                  Enviar reserva
+                                </button>
+                                <button className="button button-secondary" type="button" onClick={() => void handleCopyContractLink(reservation.id)}>
+                                  Copiar contrato
+                                </button>
+                                <button className="button button-secondary" type="button" onClick={() => void handleShareContractLink(reservation.id)}>
+                                  Enviar contrato
+                                </button>
+
+                                <span className="reservation-actions-group-title">Outros</span>
+                                <button
+                                  className="button button-danger"
+                                  type="button"
+                                  onClick={() => void handleDeleteReservation(reservation.id)}
+                                  disabled={deletingReservationId === reservation.id}
+                                >
+                                  {deletingReservationId === reservation.id ? 'Excluindo...' : 'Excluir reserva'}
+                                </button>
+                              </div>
+                            </details>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="reservations-pagination">
+              <p>
+                Exibindo <strong>{firstVisibleReservation}-{lastVisibleReservation}</strong> de <strong>{filteredReservations.length}</strong> reserva(s)
+              </p>
+              <nav className="pagination-controls" aria-label="Paginação das reservas">
+                <button
+                  className="pagination-button pagination-button--navigation"
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </button>
+                {paginationItems.map((item) =>
+                  typeof item === 'number' ? (
+                    <button
+                      key={item}
+                      className={`pagination-button${currentPage === item ? ' pagination-button--active' : ''}`}
+                      type="button"
+                      onClick={() => setCurrentPage(item)}
+                      aria-current={currentPage === item ? 'page' : undefined}
+                    >
+                      {item}
+                    </button>
+                  ) : (
+                    <span key={item} className="pagination-ellipsis" aria-hidden="true">…</span>
+                  ),
+                )}
+                <button
+                  className="pagination-button pagination-button--navigation"
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                >
+                  Próxima
+                </button>
+              </nav>
+            </div>
+          </>
         )}
       </article>
     </div>
